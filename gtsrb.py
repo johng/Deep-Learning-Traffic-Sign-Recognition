@@ -1,5 +1,11 @@
 import numpy as np
 
+WIDTH = 32
+HEIGHT = 32
+CHANNELS = 3
+OUTPUT = 43
+nTestSamples = 200
+
 
 def batch_generator(dataset, group, batch_size=100):
     idx = 0

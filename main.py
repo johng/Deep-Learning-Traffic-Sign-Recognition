@@ -50,7 +50,7 @@ run_log_dir = os.path.join(FLAGS.log_dir, 'exp_bs_{bs}_lr_{lr}_'.format(bs=FLAGS
 checkpoint_path = os.path.join(run_log_dir, 'model.ckpt')
 
 # limit the process memory to a third of the total gpu memory
-gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=1)
+gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.9)
 
 
 
@@ -136,7 +136,7 @@ def deepnn(x_image, img_shape=(32, 32, 3), class_count=43):
 
     pool4_flat = tf.reshape(conv4_bn, [-1, 1 * 1 * 64], name='conv4_bn_flattened')
 
-    fc1 = tf.layers.dense(inputs=pool4_flat, activation=tf.nn.relu, units=1024, name='fc1')
+    fc1 = tf.layers.dense(inputs=pool4_flat, activation=tf.nn.relu, units=64, name='fc1')
     logits = tf.layers.dense(inputs=fc1, units=class_count, name='fc2')
     return logits
 
@@ -145,13 +145,13 @@ def main(_):
     tf.reset_default_graph()
 
     training_data = gtsrb.batch_generator(data, 'train', FLAGS.batch_size)
-    # (32, 32, 3)
+    test_data = gtsrb.batch_generator(data, 'train', FLAGS.batch_size)
 
     # Build the graph for the deep net
     with tf.name_scope('inputs'):
-        x = tf.placeholder(tf.float32, [None, 32 * 32 * 3])
-        x_image = tf.reshape(x, [-1, 32, 32, 3])
-        y_ = tf.placeholder(tf.float32, [None, 43])
+        x = tf.placeholder(tf.float32, [None, gtsrb.WIDTH * gtsrb.HEIGHT * gtsrb.CHANNELS])
+        x_image = tf.reshape(x, [-1, gtsrb.WIDTH , gtsrb.HEIGHT , gtsrb.CHANNELS])
+        y_ = tf.placeholder(tf.float32, [None, gtsrb.OUTPUT])
 
     with tf.name_scope('model'):
         y_conv = deepnn(x_image)
@@ -184,10 +184,6 @@ def main(_):
 
     saver = tf.train.Saver(tf.global_variables(), max_to_keep=1)
 
-    transform = tf.map_fn(lambda v: tf.image.random_hue(v,0.3), x_image)
-    transform = tf.map_fn(lambda v: tf.image.random_flip_left_right(v), transform)
-    transform = tf.map_fn(lambda v: tf.image.random_brightness(v,0.5), transform)
-
     with tf.Session(config=tf.ConfigProto(gpu_options=gpu_options)) as sess:
         train_writer = tf.summary.FileWriter(run_log_dir + "_train", sess.graph)
         validation_writer = tf.summary.FileWriter(run_log_dir + "_validation", sess.graph)
@@ -196,19 +192,16 @@ def main(_):
 
         # Training and validation
         for step in range(FLAGS.max_steps):
-            (trainImages, trainLabels) = cifar.getTrainBatch()
-            (testImages, testLabels) = cifar.getTestBatch()
-
-            rand = sess.run(transform, feed_dict={x: trainImages})
-
+            (trainImages, trainLabels) = training_data.next()
+            (testImages, testLabels) = test_data.next()
 
             _, train_summary_str = sess.run([train_step, train_summary],
-                                      feed_dict={x_image: rand, y_: trainLabels})
+                                      feed_dict={x_image: trainImages, y_: trainLabels})
 
             # Validation: Monitoring accuracy using validation set
             if (step + 1) % FLAGS.log_frequency == 0:
                 validation_accuracy, validation_summary_str = sess.run([accuracy, validation_summary],
-                                                                       feed_dict={x: testImages, y_: testLabels})
+                                                                       feed_dict={x_image: testImages, y_: testLabels})
                 print('step {}, accuracy on validation set : {}'.format(step, validation_accuracy))
                 train_writer.add_summary(train_summary_str, step)
                 validation_writer.add_summary(validation_summary_str, step)
@@ -223,15 +216,14 @@ def main(_):
                 validation_writer.flush()
 
         # Resetting the internal batch indexes
-        cifar.reset()
         evaluated_images = 0
         test_accuracy = 0
         batch_count = 0
 
-        while evaluated_images != cifar.nTestSamples:
+        while evaluated_images != gtsrb.nTestSamples:
             # Don't loop back when we reach the end of the test set
-            (testImages, testLabels) = cifar.getTestBatch(allowSmallerBatches=True)
-            test_accuracy_temp = sess.run(accuracy, feed_dict={x: testImages, y_: testLabels})
+            (testImages, testLabels) = test_data.next()
+            test_accuracy_temp = sess.run(accuracy, feed_dict={x_image: testImages, y_: testLabels})
 
             batch_count += 1
             test_accuracy += test_accuracy_temp
