@@ -55,7 +55,7 @@ gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=1)
 
 
 
-def deepnn(x_image, img_shape=(32, 32, 3), class_count=10):
+def deepnn(x_image, img_shape=(32, 32, 3), class_count=43):
     """deepnn builds the graph for a deep net for classifying CIFAR10 images.
 
     Args:
@@ -79,16 +79,17 @@ def deepnn(x_image, img_shape=(32, 32, 3), class_count=10):
         name='conv1'
     )
     conv1_bn = tf.nn.relu(tf.layers.batch_normalization(conv1))
-    pool1 = tf.layers.max_pooling2d(
+    pool1 = tf.layers.average_pooling2d(
         inputs=conv1_bn,
-        pool_size=[2, 2],
+        pool_size=[3, 3],
         strides=2,
+        padding='same',
         name='pool1'
     )
 
     conv2 = tf.layers.conv2d(
         inputs=pool1,
-        filters=64,
+        filters=32,
         kernel_size=[5, 5],
         padding='same',
         activation=tf.nn.relu,
@@ -98,13 +99,44 @@ def deepnn(x_image, img_shape=(32, 32, 3), class_count=10):
     conv2_bn = tf.nn.relu(tf.layers.batch_normalization(conv2))
     pool2 = tf.layers.max_pooling2d(
         inputs=conv2_bn,
-        pool_size=[2, 2],
+        pool_size=[3, 3],
         strides=2,
+        padding='same',
         name='pool2'
     )
-    pool2_flat = tf.reshape(pool2, [-1, 8 * 8 * 64], name='pool2_flattened')
 
-    fc1 = tf.layers.dense(inputs=pool2_flat, activation=tf.nn.relu, units=1024, name='fc1')
+    conv3 = tf.layers.conv2d(
+        inputs=pool2,
+        filters=64,
+        kernel_size=[5, 5],
+        padding='same',
+        activation=tf.nn.relu,
+        use_bias=False,
+        name='conv3'
+    )
+    conv3_bn = tf.nn.relu(tf.layers.batch_normalization(conv3))
+    pool3 = tf.layers.max_pooling2d(
+        inputs=conv3_bn,
+        pool_size=[3, 3],
+        strides=2,
+        padding='same',
+        name='pool3'
+    )
+
+    conv4 = tf.layers.conv2d(
+        inputs=pool3,
+        filters=64,
+        kernel_size=[4, 4],
+        padding='valid',
+        activation=tf.nn.relu,
+        use_bias=False,
+        name='conv4'
+    )
+    conv4_bn = tf.nn.relu(tf.layers.batch_normalization(conv4))
+
+    pool4_flat = tf.reshape(conv4_bn, [-1, 1 * 1 * 64], name='conv4_bn_flattened')
+
+    fc1 = tf.layers.dense(inputs=pool4_flat, activation=tf.nn.relu, units=1024, name='fc1')
     logits = tf.layers.dense(inputs=fc1, units=class_count, name='fc2')
     return logits
 
@@ -113,13 +145,13 @@ def main(_):
     tf.reset_default_graph()
 
     training_data = gtsrb.batch_generator(data, 'train', FLAGS.batch_size)
-
+    # (32, 32, 3)
 
     # Build the graph for the deep net
     with tf.name_scope('inputs'):
-        x = tf.placeholder(tf.float32, [None, cifar.IMG_WIDTH * cifar.IMG_HEIGHT * cifar.IMG_CHANNELS])
-        x_image = tf.reshape(x, [-1, cifar.IMG_WIDTH, cifar.IMG_HEIGHT, cifar.IMG_CHANNELS])
-        y_ = tf.placeholder(tf.float32, [None, len(cifar.classNames)])
+        x = tf.placeholder(tf.float32, [None, 32 * 32 * 3])
+        x_image = tf.reshape(x, [-1, 32, 32, 3])
+        y_ = tf.placeholder(tf.float32, [None, 43])
 
     with tf.name_scope('model'):
         y_conv = deepnn(x_image)
