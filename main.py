@@ -20,10 +20,14 @@ import os
 import tensorflow as tf
 
 import numpy as np
+import gtsrb
 here = os.path.dirname(__file__)
 sys.path.append(here)
-sys.path.append(os.path.join(here, '..', 'CIFAR10'))
-import cifar10 as cf
+
+data = np.load('gtsrb_dataset.npz')
+
+
+
 
 FLAGS = tf.app.flags.FLAGS
 tf.app.flags.DEFINE_integer('log-frequency', 10,
@@ -41,12 +45,14 @@ tf.app.flags.DEFINE_integer('batch-size', 128, 'Number of examples per mini-batc
 tf.app.flags.DEFINE_float('learning-rate', 1e-3, 'Number of examples to run. (default: %(default)d)')
 
 
-run_log_dir = os.path.join(FLAGS.log_dir, 'exp_bs_{bs}_lr_{lr}_flip_random_lr_random_hue_random_brightness'.format(bs=FLAGS.batch_size,
+run_log_dir = os.path.join(FLAGS.log_dir, 'exp_bs_{bs}_lr_{lr}_'.format(bs=FLAGS.batch_size,
                                                                        lr=FLAGS.learning_rate))
 checkpoint_path = os.path.join(run_log_dir, 'model.ckpt')
 
 # limit the process memory to a third of the total gpu memory
 gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=1)
+
+
 
 
 def deepnn(x_image, img_shape=(32, 32, 3), class_count=10):
@@ -106,7 +112,8 @@ def deepnn(x_image, img_shape=(32, 32, 3), class_count=10):
 def main(_):
     tf.reset_default_graph()
 
-    cifar = cf.cifar10(batchSize=FLAGS.batch_size)
+    training_data = gtsrb.batch_generator(data, 'train', FLAGS.batch_size)
+
 
     # Build the graph for the deep net
     with tf.name_scope('inputs'):
