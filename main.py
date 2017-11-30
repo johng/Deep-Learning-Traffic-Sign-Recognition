@@ -20,14 +20,11 @@ import os
 import tensorflow as tf
 
 import numpy as np
-import gtsrb
+
 here = os.path.dirname(__file__)
 sys.path.append(here)
 
-data = np.load('gtsrb_dataset.npz')
-
-
-
+import GTSRB as gt
 
 FLAGS = tf.app.flags.FLAGS
 tf.app.flags.DEFINE_integer('log-frequency', 10,
@@ -39,20 +36,17 @@ tf.app.flags.DEFINE_integer('save-model-frequency', 100,
 tf.app.flags.DEFINE_string('log-dir', '{cwd}/logs/'.format(cwd=os.getcwd()),
                            'Directory where to write event logs and checkpoint. (default: %(default)s)')
 # Optimisation hyperparameters
-tf.app.flags.DEFINE_integer('max-steps', 1000,
+tf.app.flags.DEFINE_integer('max-steps', 10000,
                             'Number of mini-batches to train on. (default: %(default)d)')
 tf.app.flags.DEFINE_integer('batch-size', 128, 'Number of examples per mini-batch. (default: %(default)d)')
 tf.app.flags.DEFINE_float('learning-rate', 1e-3, 'Number of examples to run. (default: %(default)d)')
 
-
 run_log_dir = os.path.join(FLAGS.log_dir, 'exp_bs_{bs}_lr_{lr}_'.format(bs=FLAGS.batch_size,
-                                                                       lr=FLAGS.learning_rate))
+                                                                        lr=FLAGS.learning_rate))
 checkpoint_path = os.path.join(run_log_dir, 'model.ckpt')
 
 # limit the process memory to a third of the total gpu memory
 gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.9)
-
-
 
 
 def deepnn(x_image, img_shape=(32, 32, 3), class_count=43):
@@ -144,13 +138,13 @@ def deepnn(x_image, img_shape=(32, 32, 3), class_count=43):
 def main(_):
     tf.reset_default_graph()
 
-    training_data = gtsrb.batch_generator(data, 'train', FLAGS.batch_size)
-    test_data = gtsrb.batch_generator(data, 'train', FLAGS.batch_size)
+    gtsrb = gt.gtsrb(batchsize=FLAGS.batch_size)
+
 
     # Build the graph for the deep net
     with tf.name_scope('inputs'):
         x = tf.placeholder(tf.float32, [None, gtsrb.WIDTH * gtsrb.HEIGHT * gtsrb.CHANNELS])
-        x_image = tf.reshape(x, [-1, gtsrb.WIDTH , gtsrb.HEIGHT , gtsrb.CHANNELS])
+        x_image = tf.reshape(x, [-1, gtsrb.WIDTH, gtsrb.HEIGHT, gtsrb.CHANNELS])
         y_ = tf.placeholder(tf.float32, [None, gtsrb.OUTPUT])
 
     with tf.name_scope('model'):
@@ -164,7 +158,7 @@ def main(_):
     decay_steps = 1000  # decay the learning rate every 1000 steps
     decay_rate = 0.8  # the base of our exponential for the decay
     decayed_learning_rate = tf.train.exponential_decay(FLAGS.learning_rate, global_step,
-                               decay_steps, decay_rate, staircase=True)
+                                                       decay_steps, decay_rate, staircase=True)
 
     # We need to update the dependencies of the minimization op so that it all ops in the `UPDATE_OPS`
     # are added as a dependency, this ensures that we update the mean and variance of the batch normalisation
@@ -192,11 +186,11 @@ def main(_):
 
         # Training and validation
         for step in range(FLAGS.max_steps):
-            (trainImages, trainLabels) = training_data.next()
-            (testImages, testLabels) = test_data.next()
+            (trainImages, trainLabels) = gtsrb.getTrainBatch()
+            (testImages, testLabels) = gtsrb.getTestBatch()
 
             _, train_summary_str = sess.run([train_step, train_summary],
-                                      feed_dict={x_image: trainImages, y_: trainLabels})
+                                            feed_dict={x_image: trainImages, y_: trainLabels})
 
             # Validation: Monitoring accuracy using validation set
             if (step + 1) % FLAGS.log_frequency == 0:
@@ -205,7 +199,6 @@ def main(_):
                 print('step {}, accuracy on validation set : {}'.format(step, validation_accuracy))
                 train_writer.add_summary(train_summary_str, step)
                 validation_writer.add_summary(validation_summary_str, step)
-
 
             # Save the model checkpoint periodically.
             if (step + 1) % FLAGS.save_model_frequency == 0 or (step + 1) == FLAGS.max_steps:
@@ -222,7 +215,7 @@ def main(_):
 
         while evaluated_images != gtsrb.nTestSamples:
             # Don't loop back when we reach the end of the test set
-            (testImages, testLabels) = test_data.next()
+            (testImages, testLabels) = gtsrb.getTestBatch()
             test_accuracy_temp = sess.run(accuracy, feed_dict={x_image: testImages, y_: testLabels})
 
             batch_count += 1
