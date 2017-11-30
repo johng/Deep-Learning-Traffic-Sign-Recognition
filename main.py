@@ -37,7 +37,7 @@ checkpoint_path = os.path.join(run_log_dir, 'model.ckpt')
 gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.9)
 
 
-def deepnn(x_image, img_shape=(32, 32, 3), class_count=43):
+def deepnn(x_image, output=43):
     # First convolutional layer - maps one RGB image to 32 feature maps.
     conv1 = tf.layers.conv2d(
         inputs=x_image,
@@ -106,7 +106,7 @@ def deepnn(x_image, img_shape=(32, 32, 3), class_count=43):
     pool4_flat = tf.reshape(conv4_bn, [-1, 1 * 1 * 64], name='conv4_bn_flattened')
 
     fc1 = tf.layers.dense(inputs=pool4_flat, activation=tf.nn.relu, units=64, name='fc1')
-    logits = tf.layers.dense(inputs=fc1, units=class_count, name='fc2')
+    logits = tf.layers.dense(inputs=fc1, units=output, name='fc2')
     return logits
 
 
