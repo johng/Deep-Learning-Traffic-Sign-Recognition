@@ -8,7 +8,7 @@ class gtsrb:
     OUTPUT = 43
     nTestSamples = 200
 
-    def __init__(self, batchsize=128):
+    def __init__(self, batch_size=128):
 
         dataset = np.load('gtsrb_dataset.npz')
 
@@ -20,21 +20,19 @@ class gtsrb:
         self.nTrainSamples = len(self.trainLabels)
         self.nTestSamples = len(self.testLabels)
 
-        self.batchSize = batchsize
+        self.batchSize = batch_size
 
         self.pTrain = np.random.permutation(self.nTrainSamples)
         self.pTest = np.random.permutation(self.nTestSamples)
 
-
-
         self.currentIndexTest = 0
         self.currentIndexTrain = 0
 
-    def getTrainBatch(self, allowSmallerBatches=False):
-        return self._getBatch('train', allowSmallerBatches)
+    def get_train_batch(self, allow_smaller_batches=False):
+        return self._get_batch('train', allow_smaller_batches)
 
-    def getTestBatch(self, allowSmallerBatches=False):
-        return self._getBatch('test', allowSmallerBatches)
+    def get_test_batch(self, allow_smaller_batches=False):
+        return self._get_batch('test', allow_smaller_batches)
 
     def reset(self):
 
@@ -43,19 +41,19 @@ class gtsrb:
         self.pTrain = np.random.permutation(self.nTrainSamples)
         self.pTest = np.random.permutation(self.nTestSamples)
 
-    def _getBatch(self, dataSet, allowSmallerBatches=False):
+    def _get_batch(self, data_set, allow_smaller_batches=False):
 
         D = np.array([])
         L = np.array([])
 
-        if dataSet == 'train':
+        if data_set == 'train':
             train = True
             test = False
-        elif dataSet == 'test':
+        elif data_set == 'test':
             train = False
             test = True
         else:
-            raise ValueError('_getBatch: Unrecognised set: ' + dataSet)
+            raise ValueError('_getBatch: Unrecognised set: ' + data_set)
 
         while True:
             if train:
@@ -76,7 +74,7 @@ class gtsrb:
                 D = np.concatenate((D, d))
                 L = np.concatenate((L, l))
 
-            if D.shape[0] == self.batchSize or allowSmallerBatches:
+            if D.shape[0] == self.batchSize or allow_smaller_batches:
                 break
 
         return D, L

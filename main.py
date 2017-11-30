@@ -1,30 +1,14 @@
-############################################################
-#                                                          #
-#  Code for Lab 3: Data Augmentation and Debugging Strat.  #
-#                                                          #
-############################################################
-
-"""Based on TensorFLow's tutorial: A deep MNIST classifier using convolutional layers.
-
-See extensive documentation at
-https://www.tensorflow.org/get_started/mnist/pros
-"""
-
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
 import sys
 import os
-
+import GTSRB as GT
 import tensorflow as tf
-
-import numpy as np
 
 here = os.path.dirname(__file__)
 sys.path.append(here)
-
-import GTSRB as gt
 
 FLAGS = tf.app.flags.FLAGS
 tf.app.flags.DEFINE_integer('log-frequency', 10,
@@ -41,8 +25,12 @@ tf.app.flags.DEFINE_integer('max-steps', 10000,
 tf.app.flags.DEFINE_integer('batch-size', 128, 'Number of examples per mini-batch. (default: %(default)d)')
 tf.app.flags.DEFINE_float('learning-rate', 1e-3, 'Number of examples to run. (default: %(default)d)')
 
-run_log_dir = os.path.join(FLAGS.log_dir, 'exp_bs_{bs}_lr_{lr}_'.format(bs=FLAGS.batch_size,
-                                                                        lr=FLAGS.learning_rate))
+# Graph Options
+tf.app.flags.DEFINE_bool('data-augment', True, 'Add randomized rotation and flipping to training data')
+
+run_log_dir = os.path.join(FLAGS.log_dir, 'exp_bs_{bs}_lr_{lr}_augment_{aug}'.format(bs=FLAGS.batch_size,
+                                                                                     lr=FLAGS.learning_rate,
+                                                                                     aug=FLAGS.data_augment))
 checkpoint_path = os.path.join(run_log_dir, 'model.ckpt')
 
 # limit the process memory to a third of the total gpu memory
@@ -50,19 +38,6 @@ gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.9)
 
 
 def deepnn(x_image, img_shape=(32, 32, 3), class_count=43):
-    """deepnn builds the graph for a deep net for classifying CIFAR10 images.
-
-    Args:
-        x_image: an input tensor whose ``shape[1:] = img_space``
-            (i.e. a batch of images conforming to the shape specified in ``img_shape``)
-        img_shape: Input image shape: (width, height, depth)
-        class_count: number of classes in dataset
-
-    Returns: A tensor of shape (N_examples, 10), with values equal to the logits of
-      classifying the object images into one of 10 classes
-      (airplane, automobile, bird, cat, deer, dog, frog, horse, ship, truck)
-    """
-
     # First convolutional layer - maps one RGB image to 32 feature maps.
     conv1 = tf.layers.conv2d(
         inputs=x_image,
@@ -138,16 +113,20 @@ def deepnn(x_image, img_shape=(32, 32, 3), class_count=43):
 def main(_):
     tf.reset_default_graph()
 
-    gtsrb = gt.gtsrb(batchsize=FLAGS.batch_size)
+    gtsrb = GT.gtsrb(batch_size=FLAGS.batch_size)
 
+    augment = tf.placeholder(tf.bool)
     # Build the graph for the deep net
     with tf.name_scope('inputs'):
+
         x = tf.placeholder(tf.float32, [None, gtsrb.WIDTH * gtsrb.HEIGHT * gtsrb.CHANNELS])
         x_image = tf.reshape(x, [-1, gtsrb.WIDTH, gtsrb.HEIGHT, gtsrb.CHANNELS])
+        transform = tf.map_fn(lambda v: tf.image.random_flip_left_right(v), x_image)
+
         y_ = tf.placeholder(tf.float32, [None, gtsrb.OUTPUT])
 
     with tf.name_scope('model'):
-        y_conv = deepnn(x_image)
+        y_conv = deepnn(tf.cond(augment, lambda: transform, lambda: x_image))
 
     cross_entropy = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=y_, logits=y_conv))
     correct_prediction = tf.equal(tf.argmax(y_conv, 1), tf.argmax(y_, 1))
@@ -185,16 +164,17 @@ def main(_):
 
         # Training and validation
         for step in range(FLAGS.max_steps):
-            (trainImages, trainLabels) = gtsrb.getTrainBatch()
-            (testImages, testLabels) = gtsrb.getTestBatch()
+            (trainImages, trainLabels) = gtsrb.get_train_batch()
+            (testImages, testLabels) = gtsrb.get_test_batch()
 
             _, train_summary_str = sess.run([train_step, train_summary],
-                                            feed_dict={x_image: trainImages, y_: trainLabels})
+                                            feed_dict={x_image: trainImages, y_: trainLabels, augment: True})
 
             # Validation: Monitoring accuracy using validation set
             if (step + 1) % FLAGS.log_frequency == 0:
                 validation_accuracy, validation_summary_str = sess.run([accuracy, validation_summary],
-                                                                       feed_dict={x_image: testImages, y_: testLabels})
+                                                                       feed_dict={x_image: testImages, y_: testLabels,
+                                                                                  augment: False})
                 print('step {}, accuracy on validation set : {}'.format(step, validation_accuracy))
                 train_writer.add_summary(train_summary_str, step)
                 validation_writer.add_summary(validation_summary_str, step)
@@ -216,8 +196,8 @@ def main(_):
 
         while evaluated_images != gtsrb.nTestSamples:
             # Don't loop back when we reach the end of the test set
-            (testImages, testLabels) = gtsrb.getTestBatch(allowSmallerBatches=True)
-            test_accuracy_temp = sess.run(accuracy, feed_dict={x_image: testImages, y_: testLabels})
+            (testImages, testLabels) = gtsrb.get_test_batch(allow_smaller_batches=True)
+            test_accuracy_temp = sess.run(accuracy, feed_dict={x_image: testImages, y_: testLabels, augment: False})
 
             batch_count += 1
             test_accuracy += test_accuracy_temp
@@ -232,4 +212,4 @@ def main(_):
 
 
 if __name__ == '__main__':
-    tf.app.run(main=main)
+    tf.app.run()
