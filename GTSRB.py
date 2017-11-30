@@ -1,16 +1,12 @@
 import numpy as np
 
 
-
-
-class gtsrb :
-
+class gtsrb:
     WIDTH = 32
     HEIGHT = 32
     CHANNELS = 3
     OUTPUT = 43
     nTestSamples = 200
-
 
     def __init__(self, batchsize=128):
 
@@ -24,14 +20,15 @@ class gtsrb :
         self.nTrainSamples = len(self.trainLabels)
         self.nTestSamples = len(self.testLabels)
 
+        self.batchSize = batchsize
+
         self.pTrain = np.random.permutation(self.nTrainSamples)
         self.pTest = np.random.permutation(self.nTestSamples)
 
-        self.batchSize = batchsize
+
 
         self.currentIndexTest = 0
         self.currentIndexTrain = 0
-
 
     def getTrainBatch(self, allowSmallerBatches=False):
         return self._getBatch('train', allowSmallerBatches)
@@ -39,6 +36,12 @@ class gtsrb :
     def getTestBatch(self, allowSmallerBatches=False):
         return self._getBatch('test', allowSmallerBatches)
 
+    def reset(self):
+
+        self.currentIndexTrain = 0
+        self.currentIndexTest = 0
+        self.pTrain = np.random.permutation(self.nTrainSamples)
+        self.pTest = np.random.permutation(self.nTestSamples)
 
     def _getBatch(self, dataSet, allowSmallerBatches=False):
 
@@ -76,7 +79,4 @@ class gtsrb :
             if D.shape[0] == self.batchSize or allowSmallerBatches:
                 break
 
-        return (D, L)
-
-
-
+        return D, L

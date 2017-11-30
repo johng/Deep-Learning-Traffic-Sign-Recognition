@@ -31,7 +31,7 @@ tf.app.flags.DEFINE_integer('log-frequency', 10,
                             'Number of steps between logging results to the console and saving summaries. (default: %(default)d)')
 tf.app.flags.DEFINE_integer('flush-frequency', 50,
                             'Number of steps between flushing summary results. (default: %(default)d)')
-tf.app.flags.DEFINE_integer('save-model-frequency', 100,
+tf.app.flags.DEFINE_integer('save-model-frequency', 100000,
                             'Number of steps between model saves. (default: %(default)d)')
 tf.app.flags.DEFINE_string('log-dir', '{cwd}/logs/'.format(cwd=os.getcwd()),
                            'Directory where to write event logs and checkpoint. (default: %(default)s)')
@@ -140,7 +140,6 @@ def main(_):
 
     gtsrb = gt.gtsrb(batchsize=FLAGS.batch_size)
 
-
     # Build the graph for the deep net
     with tf.name_scope('inputs'):
         x = tf.placeholder(tf.float32, [None, gtsrb.WIDTH * gtsrb.HEIGHT * gtsrb.CHANNELS])
@@ -213,9 +212,11 @@ def main(_):
         test_accuracy = 0
         batch_count = 0
 
+        gtsrb.reset()
+
         while evaluated_images != gtsrb.nTestSamples:
             # Don't loop back when we reach the end of the test set
-            (testImages, testLabels) = gtsrb.getTestBatch()
+            (testImages, testLabels) = gtsrb.getTestBatch(allowSmallerBatches=True)
             test_accuracy_temp = sess.run(accuracy, feed_dict={x_image: testImages, y_: testLabels})
 
             batch_count += 1
