@@ -28,6 +28,7 @@ tf.app.flags.DEFINE_float('learning-rate', 1e-3, 'Number of examples to run. (de
 # Graph Options
 tf.app.flags.DEFINE_bool('data-augment', True, 'Add randomized rotation and flipping to training data')
 
+
 run_log_dir = os.path.join(FLAGS.log_dir, 'exp_bs_{bs}_lr_{lr}_augment_{aug}'.format(bs=FLAGS.batch_size,
                                                                                      lr=FLAGS.learning_rate,
                                                                                      aug=FLAGS.data_augment))
@@ -36,6 +37,8 @@ checkpoint_path = os.path.join(run_log_dir, 'model.ckpt')
 # limit the process memory to a third of the total gpu memory
 gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.9)
 
+
+# TODO : Add correct padding using tf.pad
 
 def deepnn(x_image, output=43):
     # First convolutional layer - maps one RGB image to 32 feature maps.
@@ -121,7 +124,7 @@ def main(_):
 
         x = tf.placeholder(tf.float32, [None, gtsrb.WIDTH * gtsrb.HEIGHT * gtsrb.CHANNELS])
         x_image = tf.reshape(x, [-1, gtsrb.WIDTH, gtsrb.HEIGHT, gtsrb.CHANNELS])
-        transform = tf.map_fn(lambda v: tf.image.random_flip_left_right(v), x_image)
+        transform = tf.map_fn(lambda v: tf.image.random_flip_up_down(v), x_image)
 
         y_ = tf.placeholder(tf.float32, [None, gtsrb.OUTPUT])
 
