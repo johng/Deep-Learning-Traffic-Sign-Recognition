@@ -11,11 +11,11 @@ here = os.path.dirname(__file__)
 sys.path.append(here)
 
 FLAGS = tf.app.flags.FLAGS
-tf.app.flags.DEFINE_integer('log-frequency', 10,
+tf.app.flags.DEFINE_integer('log-frequency', 100,
                             'Number of steps between logging results to the console and saving summaries. (default: %(default)d)')
 tf.app.flags.DEFINE_integer('flush-frequency', 50,
                             'Number of steps between flushing summary results. (default: %(default)d)')
-tf.app.flags.DEFINE_integer('save-model-frequency', 100000,
+tf.app.flags.DEFINE_integer('save-model-frequency', 100,
                             'Number of steps between model saves. (default: %(default)d)')
 tf.app.flags.DEFINE_string('log-dir', '{cwd}/logs/'.format(cwd=os.getcwd()),
                            'Directory where to write event logs and checkpoint. (default: %(default)s)')
@@ -23,15 +23,15 @@ tf.app.flags.DEFINE_string('log-dir', '{cwd}/logs/'.format(cwd=os.getcwd()),
 tf.app.flags.DEFINE_integer('max-steps', 10000,
                             'Number of mini-batches to train on. (default: %(default)d)')
 tf.app.flags.DEFINE_integer('batch-size', 128, 'Number of examples per mini-batch. (default: %(default)d)')
-tf.app.flags.DEFINE_float('learning-rate', 1e-3, 'Number of examples to run. (default: %(default)d)')
+tf.app.flags.DEFINE_float('learning-rate', 0.5, 'Number of examples to run. (default: %(default)d)')
 
 # Graph Options
 tf.app.flags.DEFINE_bool('data-augment', True, 'Add randomized rotation and flipping to training data')
 
 
-run_log_dir = os.path.join(FLAGS.log_dir, 'exp_bs_{bs}_lr_{lr}_augment_{aug}'.format(bs=FLAGS.batch_size,
-                                                                                     lr=FLAGS.learning_rate,
-                                                                                     aug=FLAGS.data_augment))
+run_log_dir = os.path.join(FLAGS.log_dir, 'exp_bs_{bs}_lr_{lr}'.format(bs=FLAGS.batch_size, lr=FLAGS.learning_rate))
+
+
 checkpoint_path = os.path.join(run_log_dir, 'model.ckpt')
 
 # limit the process memory to a third of the total gpu memory
@@ -41,27 +41,33 @@ gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.9)
 # TODO : Add correct padding using tf.pad
 
 def deepnn(x_image, output=43):
+
+    padding_pooling = [[0, 0], [0,1], [0,1],[0,0]]
+
     # First convolutional layer - maps one RGB image to 32 feature maps.
     conv1 = tf.layers.conv2d(
         inputs=x_image,
         filters=32,
+        kernel_initializer=tf.truncated_normal_initializer(mean=0, stddev=0.01),
         kernel_size=[5, 5],
         padding='same',
         use_bias=False,
         name='conv1'
     )
     conv1_bn = tf.nn.relu(tf.layers.batch_normalization(conv1))
+    conv1_bn_pad = tf.pad(conv1_bn, padding_pooling,"CONSTANT")
     pool1 = tf.layers.average_pooling2d(
-        inputs=conv1_bn,
+        inputs=conv1_bn_pad,
         pool_size=[3, 3],
         strides=2,
-        padding='same',
+        padding='valid',
         name='pool1'
     )
 
     conv2 = tf.layers.conv2d(
         inputs=pool1,
         filters=32,
+        kernel_initializer=tf.truncated_normal_initializer(mean=0,stddev=0.01),
         kernel_size=[5, 5],
         padding='same',
         activation=tf.nn.relu,
@@ -69,16 +75,18 @@ def deepnn(x_image, output=43):
         name='conv2'
     )
     conv2_bn = tf.nn.relu(tf.layers.batch_normalization(conv2))
+    conv2_bn_pad = tf.pad(conv2_bn, padding_pooling, "CONSTANT")
     pool2 = tf.layers.max_pooling2d(
-        inputs=conv2_bn,
+        inputs=conv2_bn_pad,
         pool_size=[3, 3],
         strides=2,
-        padding='same',
+        padding='valid',
         name='pool2'
     )
 
     conv3 = tf.layers.conv2d(
         inputs=pool2,
+        kernel_initializer=tf.truncated_normal_initializer(mean=0,stddev=0.01),
         filters=64,
         kernel_size=[5, 5],
         padding='same',
@@ -87,11 +95,12 @@ def deepnn(x_image, output=43):
         name='conv3'
     )
     conv3_bn = tf.nn.relu(tf.layers.batch_normalization(conv3))
+    conv3bn_pad = tf.pad(conv3_bn, padding_pooling, "CONSTANT")
     pool3 = tf.layers.max_pooling2d(
-        inputs=conv3_bn,
+        inputs=conv3bn_pad,
         pool_size=[3, 3],
         strides=2,
-        padding='same',
+        padding='valid',
         name='pool3'
     )
 
@@ -108,9 +117,14 @@ def deepnn(x_image, output=43):
 
     pool4_flat = tf.reshape(conv4_bn, [-1, 1 * 1 * 64], name='conv4_bn_flattened')
 
-    fc1 = tf.layers.dense(inputs=pool4_flat, activation=tf.nn.relu, units=64, name='fc1')
-    logits = tf.layers.dense(inputs=fc1, units=output, name='fc2')
+    logits = tf.layers.dense(inputs=pool4_flat,
+                             units=output,
+
+                             kernel_initializer=tf.truncated_normal_initializer(mean=0,stddev=0.01),
+                             name='fc1',
+                             )
     return logits
+
 
 
 def main(_):
@@ -129,7 +143,7 @@ def main(_):
         y_ = tf.placeholder(tf.float32, [None, gtsrb.OUTPUT])
 
     with tf.name_scope('model'):
-        y_conv = deepnn(tf.cond(augment, lambda: transform, lambda: x_image))
+        y_conv = deepnn(x_image)
 
     cross_entropy = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=y_, logits=y_conv))
     correct_prediction = tf.equal(tf.argmax(y_conv, 1), tf.argmax(y_, 1))
@@ -147,7 +161,7 @@ def main(_):
     # See https://www.tensorflow.org/api_docs/python/tf/layers/batch_normalization for more
     update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
     with tf.control_dependencies(update_ops):
-        train_step = tf.train.AdamOptimizer(decayed_learning_rate).minimize(cross_entropy, global_step=global_step)
+        train_step = tf.train.GradientDescentOptimizer(decayed_learning_rate).minimize(cross_entropy, global_step=global_step)
 
     loss_summary = tf.summary.scalar("Loss", cross_entropy)
     accuracy_summary = tf.summary.scalar("Accuracy", accuracy)
@@ -178,7 +192,7 @@ def main(_):
                 validation_accuracy, validation_summary_str = sess.run([accuracy, validation_summary],
                                                                        feed_dict={x_image: testImages, y_: testLabels,
                                                                                   augment: False})
-                print('step {}, accuracy on validation set : {}'.format(step, validation_accuracy))
+                print('step {}, accuracy on validation set : {}'.format(step+1, validation_accuracy))
                 train_writer.add_summary(train_summary_str, step)
                 validation_writer.add_summary(validation_summary_str, step)
 

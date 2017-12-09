@@ -8,6 +8,7 @@ class gtsrb:
     OUTPUT = 43
     nTestSamples = 200
 
+
     def __init__(self, batch_size=128):
 
         dataset = np.load('gtsrb_dataset.npz')
@@ -16,6 +17,18 @@ class gtsrb:
         self.trainLabels = dataset['y_{0:s}'.format('train')]
         self.testData = dataset['X_{0:s}'.format('test')]
         self.testLabels = dataset['y_{0:s}'.format('test')]
+
+        meanTrain = np.mean(self.trainData, 0)
+        stdDevTrain = np.std(self.trainData, 0)
+        adjusted = (self.trainData - meanTrain) / stdDevTrain
+
+        self.trainData = adjusted
+
+        meanTest = np.mean(self.testData, 0)
+        stdDevTest = np.std(self.testData, 0)
+        adjusted = (self.testData - meanTest) / stdDevTest
+
+        self.testData = adjusted
 
         self.nTrainSamples = len(self.trainLabels)
         self.nTestSamples = len(self.testLabels)
@@ -27,6 +40,7 @@ class gtsrb:
 
         self.currentIndexTest = 0
         self.currentIndexTrain = 0
+
 
     def get_train_batch(self, allow_smaller_batches=False):
         return self._get_batch('train', allow_smaller_batches)
