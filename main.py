@@ -23,7 +23,7 @@ tf.app.flags.DEFINE_string('log-dir', '{cwd}/logs/'.format(cwd=os.getcwd()),
 tf.app.flags.DEFINE_integer('max-steps', 10000,
                             'Number of mini-batches to train on. (default: %(default)d)')
 tf.app.flags.DEFINE_integer('batch-size', 128, 'Number of examples per mini-batch. (default: %(default)d)')
-tf.app.flags.DEFINE_float('learning-rate', 0.5, 'Number of examples to run. (default: %(default)d)')
+tf.app.flags.DEFINE_float('learning-rate', 0.1, 'Number of examples to run. (default: %(default)d)')
 
 # Graph Options
 tf.app.flags.DEFINE_bool('data-augment', True, 'Add randomized rotation and flipping to training data')
@@ -38,11 +38,12 @@ checkpoint_path = os.path.join(run_log_dir, 'model.ckpt')
 gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.9)
 
 
-# TODO : Add correct padding using tf.pad
 
 def deepnn(x_image, output=43):
 
     padding_pooling = [[0, 0], [0,1], [0,1],[0,0]]
+
+    weight_decay  = tf.contrib.layers.l2_regularizer(scale=0.0005)
 
     # First convolutional layer - maps one RGB image to 32 feature maps.
     conv1 = tf.layers.conv2d(
@@ -52,6 +53,7 @@ def deepnn(x_image, output=43):
         kernel_size=[5, 5],
         padding='same',
         use_bias=False,
+        kernel_regularizer=weight_decay,
         name='conv1'
     )
     conv1_bn = tf.nn.relu(tf.layers.batch_normalization(conv1))
@@ -72,6 +74,7 @@ def deepnn(x_image, output=43):
         padding='same',
         activation=tf.nn.relu,
         use_bias=False,
+        kernel_regularizer=weight_decay,
         name='conv2'
     )
     conv2_bn = tf.nn.relu(tf.layers.batch_normalization(conv2))
@@ -92,6 +95,7 @@ def deepnn(x_image, output=43):
         padding='same',
         activation=tf.nn.relu,
         use_bias=False,
+        kernel_regularizer=weight_decay,
         name='conv3'
     )
     conv3_bn = tf.nn.relu(tf.layers.batch_normalization(conv3))
@@ -110,6 +114,7 @@ def deepnn(x_image, output=43):
         kernel_size=[4, 4],
         padding='valid',
         activation=tf.nn.relu,
+        kernel_regularizer=weight_decay,
         use_bias=False,
         name='conv4'
     )
@@ -119,7 +124,7 @@ def deepnn(x_image, output=43):
 
     logits = tf.layers.dense(inputs=pool4_flat,
                              units=output,
-
+                             kernel_regularizer=weight_decay,
                              kernel_initializer=tf.truncated_normal_initializer(mean=0,stddev=0.01),
                              name='fc1',
                              )
@@ -151,7 +156,7 @@ def main(_):
 
     global_step = tf.Variable(0, trainable=False)  # this will be incremented automatically by tensorflow
     decay_steps = 1000  # decay the learning rate every 1000 steps
-    decay_rate = 0.8  # the base of our exponential for the decay
+    decay_rate = 0.9  # the base of our exponential for the decay
     decayed_learning_rate = tf.train.exponential_decay(FLAGS.learning_rate, global_step,
                                                        decay_steps, decay_rate, staircase=True)
 
