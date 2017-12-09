@@ -22,8 +22,8 @@ tf.app.flags.DEFINE_string('log-dir', '{cwd}/logs/'.format(cwd=os.getcwd()),
 # Optimisation hyperparameters
 tf.app.flags.DEFINE_integer('max-steps', 10000,
                             'Number of mini-batches to train on. (default: %(default)d)')
-tf.app.flags.DEFINE_integer('batch-size', 128, 'Number of examples per mini-batch. (default: %(default)d)')
-tf.app.flags.DEFINE_float('learning-rate', 0.1, 'Number of examples to run. (default: %(default)d)')
+tf.app.flags.DEFINE_integer('batch-size', 100, 'Number of examples per mini-batch. (default: %(default)d)')
+tf.app.flags.DEFINE_float('learning-rate', 0.01, 'Number of examples to run. (default: %(default)d)')
 
 # Graph Options
 tf.app.flags.DEFINE_bool('data-augment', True, 'Add randomized rotation and flipping to training data')
@@ -43,7 +43,7 @@ def deepnn(x_image, output=43):
 
     padding_pooling = [[0, 0], [0,1], [0,1],[0,0]]
 
-    weight_decay  = tf.contrib.layers.l2_regularizer(scale=0.0005)
+    weight_decay  = tf.contrib.layers.l2_regularizer(scale=0.0001)
 
     # First convolutional layer - maps one RGB image to 32 feature maps.
     conv1 = tf.layers.conv2d(
@@ -166,7 +166,7 @@ def main(_):
     # See https://www.tensorflow.org/api_docs/python/tf/layers/batch_normalization for more
     update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
     with tf.control_dependencies(update_ops):
-        train_step = tf.train.GradientDescentOptimizer(decayed_learning_rate).minimize(cross_entropy, global_step=global_step)
+        train_step = tf.train.MomentumOptimizer(decayed_learning_rate, 0.9).minimize(cross_entropy, global_step=global_step)
 
     loss_summary = tf.summary.scalar("Loss", cross_entropy)
     accuracy_summary = tf.summary.scalar("Accuracy", accuracy)
