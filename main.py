@@ -138,7 +138,7 @@ def main(_):
     augment = tf.placeholder(tf.bool)
     # Build the graph for the deep net
     with tf.name_scope('inputs'):
-
+        y_ = tf.placeholder(tf.float32, [None, gtsrb.OUTPUT])
         x = tf.placeholder(tf.float32, [None, gtsrb.WIDTH * gtsrb.HEIGHT * gtsrb.CHANNELS])
         x_image = tf.reshape(x, [-1, gtsrb.WIDTH, gtsrb.HEIGHT, gtsrb.CHANNELS])
         transform = tf.map_fn(lambda v: tf.image.random_flip_up_down(v), x_image)
@@ -152,15 +152,21 @@ def main(_):
         def random_translate():
             return tf.map_fn(lambda img: tf.contrib.image.transform(img, [1, 0, random.randint(-2, 2), 0, 1,
                                                                           random.randint(-2, 2), 0, 0]), x_image)
+
+        def rotate_and_extend():
+            x_image_rotated = random_rotate()
+            x_image_extended = tf.concat([x_image, x_image_rotated],0)
+            y_extended = tf.concat([y_, y_],0)
+            return x_image_extended, y_extended
+
         #We can also flip images whose class is invariant to flips
         #Can also flip & reclassify where applicable
+        x_image, y_ = tf.cond(augment, rotate_and_extend, lambda: (tf.identity(x_image), tf.identity(y_)))
 
-        #x_image = tf.cond(augment, random_rotate, lambda: tf.identity(x_image))
-        # x_image = tf.cond(augment, random_translate, lambda: tf.identity(x_image))
+        #x_image = tf.cond(augment, random_translate, lambda: tf.identity(x_image))
         x_image = tf.map_fn(lambda img: tf.image.per_image_standardization(img), x_image)
         x_image = tf.map_fn(lambda img: tf.image.rgb_to_hsv(img), x_image)
 
-        y_ = tf.placeholder(tf.float32, [None, gtsrb.OUTPUT])
 
     with tf.name_scope('model'):
         y_conv = deepnn(x_image)
