@@ -6,6 +6,7 @@ import sys
 import os
 import GTSRB as GT
 import tensorflow as tf
+import random
 
 here = os.path.dirname(__file__)
 sys.path.append(here)
@@ -28,22 +29,18 @@ tf.app.flags.DEFINE_float('learning-rate', 0.01, 'Number of examples to run. (de
 # Graph Options
 tf.app.flags.DEFINE_bool('data-augment', True, 'Add randomized rotation and flipping to training data')
 
-
 run_log_dir = os.path.join(FLAGS.log_dir, 'exp_bs_{bs}_lr_{lr}'.format(bs=FLAGS.batch_size, lr=FLAGS.learning_rate))
-
 
 checkpoint_path = os.path.join(run_log_dir, 'model.ckpt')
 
 # limit the process memory to a third of the total gpu memory
-gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.9)
-
+gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.7)
 
 
 def deepnn(x_image, output=43):
+    padding_pooling = [[0, 0], [0, 1], [0, 1], [0, 0]]
 
-    padding_pooling = [[0, 0], [0,1], [0,1],[0,0]]
-
-    weight_decay  = tf.contrib.layers.l2_regularizer(scale=0.0001)
+    weight_decay = tf.contrib.layers.l2_regularizer(scale=0.0001)
 
     # First convolutional layer - maps one RGB image to 32 feature maps.
     conv1 = tf.layers.conv2d(
@@ -56,8 +53,8 @@ def deepnn(x_image, output=43):
         kernel_regularizer=weight_decay,
         name='conv1'
     )
-    conv1_bn = tf.nn.relu(tf.layers.batch_normalization(conv1))
-    conv1_bn_pad = tf.pad(conv1_bn, padding_pooling,"CONSTANT")
+    conv1_bn = tf.nn.crelu(tf.layers.batch_normalization(conv1))
+    conv1_bn_pad = tf.pad(conv1_bn, padding_pooling, "CONSTANT")
     pool1 = tf.layers.average_pooling2d(
         inputs=conv1_bn_pad,
         pool_size=[3, 3],
@@ -69,15 +66,15 @@ def deepnn(x_image, output=43):
     conv2 = tf.layers.conv2d(
         inputs=pool1,
         filters=32,
-        kernel_initializer=tf.truncated_normal_initializer(mean=0,stddev=0.01),
+        kernel_initializer=tf.truncated_normal_initializer(mean=0, stddev=0.01),
         kernel_size=[5, 5],
         padding='same',
-        activation=tf.nn.relu,
+        activation=tf.nn.crelu,
         use_bias=False,
         kernel_regularizer=weight_decay,
         name='conv2'
     )
-    conv2_bn = tf.nn.relu(tf.layers.batch_normalization(conv2))
+    conv2_bn = tf.nn.crelu(tf.layers.batch_normalization(conv2))
     conv2_bn_pad = tf.pad(conv2_bn, padding_pooling, "CONSTANT")
     pool2 = tf.layers.max_pooling2d(
         inputs=conv2_bn_pad,
@@ -89,16 +86,16 @@ def deepnn(x_image, output=43):
 
     conv3 = tf.layers.conv2d(
         inputs=pool2,
-        kernel_initializer=tf.truncated_normal_initializer(mean=0,stddev=0.01),
+        kernel_initializer=tf.truncated_normal_initializer(mean=0, stddev=0.01),
         filters=64,
         kernel_size=[5, 5],
         padding='same',
-        activation=tf.nn.relu,
+        activation=tf.nn.crelu,
         use_bias=False,
         kernel_regularizer=weight_decay,
         name='conv3'
     )
-    conv3_bn = tf.nn.relu(tf.layers.batch_normalization(conv3))
+    conv3_bn = tf.nn.crelu(tf.layers.batch_normalization(conv3))
     conv3bn_pad = tf.pad(conv3_bn, padding_pooling, "CONSTANT")
     pool3 = tf.layers.max_pooling2d(
         inputs=conv3bn_pad,
@@ -125,11 +122,10 @@ def deepnn(x_image, output=43):
     logits = tf.layers.dense(inputs=pool4_flat,
                              units=output,
                              kernel_regularizer=weight_decay,
-                             kernel_initializer=tf.truncated_normal_initializer(mean=0,stddev=0.01),
+                             kernel_initializer=tf.truncated_normal_initializer(mean=0, stddev=0.01),
                              name='fc1',
                              )
     return logits
-
 
 
 def main(_):
@@ -145,6 +141,19 @@ def main(_):
         x_image = tf.reshape(x, [-1, gtsrb.WIDTH, gtsrb.HEIGHT, gtsrb.CHANNELS])
         transform = tf.map_fn(lambda v: tf.image.random_flip_up_down(v), x_image)
 
+        # Transformations as listed in http://ieeexplore.ieee.org/stamp/stamp.jsp?tp=&arnumber=6033589
+        # random rotation -15,15 degrees
+        def random_rotate(): return tf.map_fn(lambda img: tf.contrib.image.rotate(img, random.uniform(-0.26, 0.26)),
+                                              x_image)
+
+        # random translation -2,2 pixels
+        def random_translate():
+            return tf.map_fn(lambda img: tf.contrib.image.transform(img, [1, 0, random.randint(-2, 2), 0, 1,
+                                                                          random.randint(-2, 2), 0, 0]), x_image)
+
+        x_image = tf.map_fn(lambda img: tf.image.rgb_to_hsv(img), x_image)
+        #x_image = tf.cond(augment, random_rotate, lambda: tf.identity(x_image))
+        # x_image = tf.cond(augment, random_translate, lambda: tf.identity(x_image))
         y_ = tf.placeholder(tf.float32, [None, gtsrb.OUTPUT])
 
     with tf.name_scope('model'):
@@ -166,7 +175,8 @@ def main(_):
     # See https://www.tensorflow.org/api_docs/python/tf/layers/batch_normalization for more
     update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
     with tf.control_dependencies(update_ops):
-        train_step = tf.train.MomentumOptimizer(decayed_learning_rate, 0.9).minimize(cross_entropy, global_step=global_step)
+        train_step = tf.train.MomentumOptimizer(decayed_learning_rate, 0.9).minimize(cross_entropy,
+                                                                                     global_step=global_step)
 
     loss_summary = tf.summary.scalar("Loss", cross_entropy)
     accuracy_summary = tf.summary.scalar("Accuracy", accuracy)
@@ -188,7 +198,7 @@ def main(_):
         for step in range(FLAGS.max_steps):
             (trainImages, trainLabels) = gtsrb.get_train_batch()
             (testImages, testLabels) = gtsrb.get_test_batch()
-
+            # rotated_training_images = sess.run([rotation], feed_dict={x_image: trainImages})
             _, train_summary_str = sess.run([train_step, train_summary],
                                             feed_dict={x_image: trainImages, y_: trainLabels, augment: True})
 
@@ -197,7 +207,7 @@ def main(_):
                 validation_accuracy, validation_summary_str = sess.run([accuracy, validation_summary],
                                                                        feed_dict={x_image: testImages, y_: testLabels,
                                                                                   augment: False})
-                print('step {}, accuracy on validation set : {}'.format(step+1, validation_accuracy))
+                print('step {}, accuracy on validation set : {}'.format(step + 1, validation_accuracy))
                 train_writer.add_summary(train_summary_str, step)
                 validation_writer.add_summary(validation_summary_str, step)
 
