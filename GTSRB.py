@@ -18,18 +18,6 @@ class gtsrb:
         self.testData = dataset['X_{0:s}'.format('test')]
         self.testLabels = dataset['y_{0:s}'.format('test')]
 
-        meanTrain = np.mean(self.trainData, 0)
-        stdDevTrain = np.std(self.trainData, 0)
-        adjusted = (self.trainData - meanTrain) / stdDevTrain
-
-        self.trainData = adjusted
-
-        meanTest = np.mean(self.testData, 0)
-        stdDevTest = np.std(self.testData, 0)
-        adjusted = (self.testData - meanTest) / stdDevTest
-
-        self.testData = adjusted
-
         self.nTrainSamples = len(self.trainLabels)
         self.nTestSamples = len(self.testLabels)
 

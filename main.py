@@ -104,9 +104,10 @@ def deepnn(x_image, output=43):
         padding='valid',
         name='pool3'
     )
+    pool_drop = tf.nn.dropout(pool3, 0.7)
 
     conv4 = tf.layers.conv2d(
-        inputs=pool3,
+        inputs=pool_drop,
         filters=64,
         kernel_size=[4, 4],
         padding='valid',
@@ -118,6 +119,7 @@ def deepnn(x_image, output=43):
     conv4_bn = tf.nn.relu(tf.layers.batch_normalization(conv4))
 
     pool4_flat = tf.reshape(conv4_bn, [-1, 1 * 1 * 64], name='conv4_bn_flattened')
+
 
     logits = tf.layers.dense(inputs=pool4_flat,
                              units=output,
@@ -150,10 +152,14 @@ def main(_):
         def random_translate():
             return tf.map_fn(lambda img: tf.contrib.image.transform(img, [1, 0, random.randint(-2, 2), 0, 1,
                                                                           random.randint(-2, 2), 0, 0]), x_image)
+        #We can also flip images whose class is invariant to flips
+        #Can also flip & reclassify where applicable
 
-        x_image = tf.map_fn(lambda img: tf.image.rgb_to_hsv(img), x_image)
         #x_image = tf.cond(augment, random_rotate, lambda: tf.identity(x_image))
         # x_image = tf.cond(augment, random_translate, lambda: tf.identity(x_image))
+        x_image = tf.map_fn(lambda img: tf.image.per_image_standardization(img), x_image)
+        x_image = tf.map_fn(lambda img: tf.image.rgb_to_hsv(img), x_image)
+
         y_ = tf.placeholder(tf.float32, [None, gtsrb.OUTPUT])
 
     with tf.name_scope('model'):
