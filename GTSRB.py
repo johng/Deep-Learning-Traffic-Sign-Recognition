@@ -1,5 +1,5 @@
 import numpy as np
-
+import matplotlib.pyplot as plt
 
 class gtsrb:
     WIDTH = 32
@@ -7,7 +7,6 @@ class gtsrb:
     CHANNELS = 3
     OUTPUT = 43
     nTestSamples = 200
-
 
     def __init__(self, batch_size=128):
 
@@ -80,3 +79,16 @@ class gtsrb:
                 break
 
         return D, L
+
+    def view_image_labels(self):
+        seen_labels = []
+        for r in range(0, len(self.trainLabels)):
+            label = self.trainLabels[r]
+            idx = np.argmax(label)
+            if idx not in seen_labels:
+                print(idx)
+                seen_labels.append(idx)
+                print(self.trainLabels[r])
+                plt.figure()
+                plt.imshow(self.trainData[r])
+                plt.show()
