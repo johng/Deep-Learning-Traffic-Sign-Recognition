@@ -154,17 +154,33 @@ def main(_):
         def random_translate():
             return tf.map_fn(lambda img: tf.contrib.image.transform(img, [1, 0, random.randint(-2, 2), 0, 1,
                                                                           random.randint(-2, 2), 0, 0]), x_image)
-
         def rotate_and_extend():
             x_image_rotated = random_rotate()
             x_image_extended = tf.concat([x_image, x_image_rotated],0)
             y_extended = tf.concat([y_, y_],0)
             return x_image_extended, y_extended
 
+        def flip_valid(image, label):
+            label_idx = tf.argmax(label, output_type=tf.int32)
+            is_valid = tf.foldl(lambda a, b: a | b, tf.equal(label_idx, flip_invariant_classes))
+            return tf.cond(is_valid, lambda: tf.image.flip_left_right(image), lambda: tf.identity(image))
+
+        def flip_valid_and_extend():
+            x_images = tf.unstack(x_image, num=FLAGS.batch_size)
+            labels = tf.unstack(y_, num=FLAGS.batch_size)
+            flipped = []
+            for idx, img in enumerate(x_images):
+                flipped.append(flip_valid(img, labels[idx]))
+            x_image_flipped = tf.stack(flipped)
+            x_image_extended = tf.concat([x_image, x_image_flipped], 0)
+            y_extended = tf.concat([y_, y_], 0)
+            return x_image_extended, y_extended
+
+
         #We can also flip images whose class is invariant to flips
         #Can also flip & reclassify where applicable
+        x_image, y_ = tf.cond(augment, flip_valid_and_extend, lambda: (tf.identity(x_image), tf.identity(y_)))
         x_image, y_ = tf.cond(augment, rotate_and_extend, lambda: (tf.identity(x_image), tf.identity(y_)))
-
         #x_image = tf.cond(augment, random_translate, lambda: tf.identity(x_image))
         x_image = tf.map_fn(lambda img: tf.image.per_image_standardization(img), x_image)
         x_image = tf.map_fn(lambda img: tf.image.rgb_to_hsv(img), x_image)
