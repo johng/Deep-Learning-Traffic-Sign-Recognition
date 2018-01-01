@@ -7,6 +7,7 @@ import os
 import GTSRB as GT
 import tensorflow as tf
 import random
+from tensorflow.python.client import timeline
 
 here = os.path.dirname(__file__)
 sys.path.append(here)
@@ -29,6 +30,7 @@ tf.app.flags.DEFINE_float('learning-rate', 0.01, 'Number of examples to run. (de
 # Graph Options
 tf.app.flags.DEFINE_bool('data-augment', True, 'Add randomized rotation and flipping to training data')
 
+tf.app.flags.DEFINE_bool('use-profile', False, 'Record trace timeline data')
 run_log_dir = os.path.join(FLAGS.log_dir, 'exp_bs_{bs}_lr_{lr}'.format(bs=FLAGS.batch_size, lr=FLAGS.learning_rate))
 
 checkpoint_path = os.path.join(run_log_dir, 'model.ckpt')
@@ -205,6 +207,11 @@ def main(_):
         validation_writer = tf.summary.FileWriter(run_log_dir + "_validation", sess.graph)
 
         sess.run(tf.global_variables_initializer())
+        options = None
+        run_metadata = None
+        if FLAGS.use_profile:
+            options = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE)
+            run_metadata = tf.RunMetadata()
 
         # Training and validation
         for step in range(FLAGS.max_steps):
@@ -212,7 +219,8 @@ def main(_):
             (testImages, testLabels) = gtsrb.get_test_batch()
             # rotated_training_images = sess.run([rotation], feed_dict={x_image: trainImages})
             _, train_summary_str = sess.run([train_step, train_summary],
-                                            feed_dict={x_image: trainImages, y_: trainLabels, augment: True})
+                                            feed_dict={x_image: trainImages, y_: trainLabels, augment: True},
+                                            options=options, run_metadata=run_metadata)
 
             # Validation: Monitoring accuracy using validation set
             if (step + 1) % FLAGS.log_frequency == 0:
@@ -253,7 +261,11 @@ def main(_):
 
         train_writer.close()
         validation_writer.close()
-
+        if FLAGS.use_profile:
+            fetched_timeline = timeline.Timeline(run_metadata.step_stats)
+            chrome_trace = fetched_timeline.generate_chrome_trace_format()
+            with open('timeline_01.json', 'w') as f:
+                f.write(chrome_trace)
 
 if __name__ == '__main__':
     tf.app.run()
