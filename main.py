@@ -55,7 +55,7 @@ def deepnn(x_image, output=43):
         kernel_regularizer=weight_decay,
         name='conv1'
     )
-    conv1_bn = tf.nn.crelu(tf.layers.batch_normalization(conv1))
+    conv1_bn = tf.nn.crelu(tf.layers.batch_normalization(conv1, fused=True))
     conv1_bn_pad = tf.pad(conv1_bn, padding_pooling, "CONSTANT")
     pool1 = tf.layers.average_pooling2d(
         inputs=conv1_bn_pad,
@@ -76,7 +76,7 @@ def deepnn(x_image, output=43):
         kernel_regularizer=weight_decay,
         name='conv2'
     )
-    conv2_bn = tf.nn.crelu(tf.layers.batch_normalization(conv2))
+    conv2_bn = tf.nn.crelu(tf.layers.batch_normalization(conv2, fused=True))
     conv2_bn_pad = tf.pad(conv2_bn, padding_pooling, "CONSTANT")
     pool2 = tf.layers.max_pooling2d(
         inputs=conv2_bn_pad,
@@ -97,7 +97,7 @@ def deepnn(x_image, output=43):
         kernel_regularizer=weight_decay,
         name='conv3'
     )
-    conv3_bn = tf.nn.crelu(tf.layers.batch_normalization(conv3))
+    conv3_bn = tf.nn.crelu(tf.layers.batch_normalization(conv3, fused=True))
     conv3bn_pad = tf.pad(conv3_bn, padding_pooling, "CONSTANT")
     pool3 = tf.layers.max_pooling2d(
         inputs=conv3bn_pad,
@@ -121,6 +121,7 @@ def deepnn(x_image, output=43):
     conv4_bn = tf.nn.relu(tf.layers.batch_normalization(conv4))
 
     pool4_flat = tf.reshape(conv4_bn, [-1, 1 * 1 * 64], name='conv4_bn_flattened')
+    conv4_bn = tf.nn.relu(tf.layers.batch_normalization(conv4, fused=True))
 
 
     logits = tf.layers.dense(inputs=pool4_flat,
