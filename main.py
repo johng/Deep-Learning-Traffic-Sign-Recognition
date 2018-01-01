@@ -24,13 +24,15 @@ tf.app.flags.DEFINE_string('log-dir', '{cwd}/logs/'.format(cwd=os.getcwd()),
 # Optimisation hyperparameters
 tf.app.flags.DEFINE_integer('max-steps', 10000,
                             'Number of mini-batches to train on. (default: %(default)d)')
-tf.app.flags.DEFINE_integer('batch-size', 100, 'Number of examples per mini-batch. (default: %(default)d)')
+tf.app.flags.DEFINE_integer('batch-size', 50, 'Number of examples per mini-batch. (default: %(default)d)')
 tf.app.flags.DEFINE_float('learning-rate', 0.01, 'Number of examples to run. (default: %(default)d)')
+tf.app.flags.DEFINE_float('dropout-keep-rate', 0.90, 'Fraction of connections to keep. (default: %(default)d')
 
 # Graph Options
 tf.app.flags.DEFINE_bool('data-augment', True, 'Add randomized rotation and flipping to training data')
 
 tf.app.flags.DEFINE_bool('use-profile', False, 'Record trace timeline data')
+
 run_log_dir = os.path.join(FLAGS.log_dir, 'exp_bs_{bs}_lr_{lr}'.format(bs=FLAGS.batch_size, lr=FLAGS.learning_rate))
 
 checkpoint_path = os.path.join(run_log_dir, 'model.ckpt')
@@ -65,8 +67,10 @@ def deepnn(x_image, output=43):
         name='pool1'
     )
 
+    pool1_drop = tf.nn.dropout(pool1, FLAGS.dropout_keep_rate)
+
     conv2 = tf.layers.conv2d(
-        inputs=pool1,
+        inputs=pool1_drop,
         filters=32,
         kernel_initializer=tf.truncated_normal_initializer(mean=0, stddev=0.01),
         kernel_size=[5, 5],
@@ -85,9 +89,11 @@ def deepnn(x_image, output=43):
         padding='valid',
         name='pool2'
     )
+    pool2_drop = tf.nn.dropout(pool2, FLAGS.dropout_keep_rate)
+
 
     conv3 = tf.layers.conv2d(
-        inputs=pool2,
+        inputs=pool2_drop,
         kernel_initializer=tf.truncated_normal_initializer(mean=0, stddev=0.01),
         filters=64,
         kernel_size=[5, 5],
@@ -106,10 +112,11 @@ def deepnn(x_image, output=43):
         padding='valid',
         name='pool3'
     )
-    pool_drop = tf.nn.dropout(pool3, 0.7)
+    pool3_drop = tf.nn.dropout(pool3, FLAGS.dropout_keep_rate)
+
 
     conv4 = tf.layers.conv2d(
-        inputs=pool_drop,
+        inputs=pool3_drop,
         filters=64,
         kernel_size=[4, 4],
         padding='valid',
@@ -118,13 +125,16 @@ def deepnn(x_image, output=43):
         use_bias=False,
         name='conv4'
     )
-    conv4_bn = tf.nn.relu(tf.layers.batch_normalization(conv4))
-
-    pool4_flat = tf.reshape(conv4_bn, [-1, 1 * 1 * 64], name='conv4_bn_flattened')
     conv4_bn = tf.nn.relu(tf.layers.batch_normalization(conv4, fused=True))
+    pool4_drop = tf.nn.dropout(conv4_bn, FLAGS.dropout_keep_rate)
 
+    pool1_flat = tf.contrib.layers.flatten(pool1_drop)
+    pool2_flat = tf.contrib.layers.flatten(pool2_drop)
+    pool3_flat = tf.contrib.layers.flatten(pool3_drop)
+    pool4_flat = tf.contrib.layers.flatten(pool4_drop)
 
-    logits = tf.layers.dense(inputs=pool4_flat,
+    full_pool = tf.concat([pool1_flat, pool2_flat, pool3_flat, pool4_flat], axis=1)
+    logits = tf.layers.dense(inputs=full_pool,
                              units=output,
                              kernel_regularizer=weight_decay,
                              kernel_initializer=tf.truncated_normal_initializer(mean=0, stddev=0.01),
@@ -137,7 +147,6 @@ def main(_):
     tf.reset_default_graph()
 
     gtsrb = GT.gtsrb(batch_size=FLAGS.batch_size)
-
     augment = tf.placeholder(tf.bool)
     # Build the graph for the deep net
     with tf.name_scope('inputs'):
@@ -146,6 +155,7 @@ def main(_):
         x_image = tf.reshape(x, [-1, gtsrb.WIDTH, gtsrb.HEIGHT, gtsrb.CHANNELS])
         transform = tf.map_fn(lambda v: tf.image.random_flip_up_down(v), x_image)
 
+        flip_invariant_classes = tf.constant([17, 12, 13, 15, 35])
         # Transformations as listed in http://ieeexplore.ieee.org/stamp/stamp.jsp?tp=&arnumber=6033589
         # random rotation -15,15 degrees
         def random_rotate(): return tf.map_fn(lambda img: tf.contrib.image.rotate(img, random.uniform(-0.26, 0.26)),
