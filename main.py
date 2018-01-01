@@ -26,7 +26,8 @@ tf.app.flags.DEFINE_integer('max-steps', 10000,
                             'Number of mini-batches to train on. (default: %(default)d)')
 tf.app.flags.DEFINE_integer('batch-size', 50, 'Number of examples per mini-batch. (default: %(default)d)')
 tf.app.flags.DEFINE_float('learning-rate', 0.01, 'Number of examples to run. (default: %(default)d)')
-tf.app.flags.DEFINE_float('dropout-keep-rate', 0.90, 'Fraction of connections to keep. (default: %(default)d')
+tf.app.flags.DEFINE_float('dropout-keep-rate', 0.8, 'Fraction of connections to keep. (default: %(default)d')
+tf.app.flags.DEFINE_integer('early-stop-epochs', 20, 'Number of steps without improvement before stopping. (default: %(default)d')
 
 # Graph Options
 tf.app.flags.DEFINE_bool('data-augment', True, 'Add randomized rotation and flipping to training data')
@@ -36,9 +37,10 @@ tf.app.flags.DEFINE_bool('use-profile', False, 'Record trace timeline data')
 run_log_dir = os.path.join(FLAGS.log_dir, 'exp_bs_{bs}_lr_{lr}'.format(bs=FLAGS.batch_size, lr=FLAGS.learning_rate))
 
 checkpoint_path = os.path.join(run_log_dir, 'model.ckpt')
+best_model_path = os.path.join('{cwd}/logs/best'.format(cwd=os.getcwd()), 'model.ckpt')
 
 # limit the process memory to a third of the total gpu memory
-gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.7)
+gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.8)
 
 
 def deepnn(x_image, output=43):
@@ -70,7 +72,7 @@ def deepnn(x_image, output=43):
     pool1_drop = tf.nn.dropout(pool1, FLAGS.dropout_keep_rate)
 
     conv2 = tf.layers.conv2d(
-        inputs=pool1_drop,
+        inputs=pool1,
         filters=32,
         kernel_initializer=tf.truncated_normal_initializer(mean=0, stddev=0.01),
         kernel_size=[5, 5],
@@ -93,7 +95,7 @@ def deepnn(x_image, output=43):
 
 
     conv3 = tf.layers.conv2d(
-        inputs=pool2_drop,
+        inputs=pool2,
         kernel_initializer=tf.truncated_normal_initializer(mean=0, stddev=0.01),
         filters=64,
         kernel_size=[5, 5],
@@ -128,10 +130,10 @@ def deepnn(x_image, output=43):
     conv4_bn = tf.nn.relu(tf.layers.batch_normalization(conv4, fused=True))
     pool4_drop = tf.nn.dropout(conv4_bn, FLAGS.dropout_keep_rate)
 
-    pool1_flat = tf.contrib.layers.flatten(pool1_drop)
-    pool2_flat = tf.contrib.layers.flatten(pool2_drop)
-    pool3_flat = tf.contrib.layers.flatten(pool3_drop)
-    pool4_flat = tf.contrib.layers.flatten(pool4_drop)
+    pool1_flat = tf.contrib.layers.flatten(pool1)
+    pool2_flat = tf.contrib.layers.flatten(pool2)
+    pool3_flat = tf.contrib.layers.flatten(pool3)
+    pool4_flat = tf.contrib.layers.flatten(conv4_bn)
 
     full_pool = tf.concat([pool1_flat, pool2_flat, pool3_flat, pool4_flat], axis=1)
     logits = tf.layers.dense(inputs=full_pool,
@@ -228,6 +230,7 @@ def main(_):
     validation_summary = tf.summary.merge([loss_summary, accuracy_summary])
 
     saver = tf.train.Saver(tf.global_variables(), max_to_keep=1)
+    best_saver = tf.train.Saver(max_to_keep=1)
 
     with tf.Session(config=tf.ConfigProto(gpu_options=gpu_options)) as sess:
         train_writer = tf.summary.FileWriter(run_log_dir + "_train", sess.graph)
@@ -240,6 +243,8 @@ def main(_):
             options = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE)
             run_metadata = tf.RunMetadata()
 
+        best_accuracy = 0
+        steps_since_last_improvement = 0
         # Training and validation
         for step in range(FLAGS.max_steps):
             (trainImages, trainLabels) = gtsrb.get_train_batch()
@@ -255,8 +260,15 @@ def main(_):
                                                                        feed_dict={x_image: testImages, y_: testLabels,
                                                                                   augment: False})
                 print('step {}, accuracy on validation set : {}'.format(step + 1, validation_accuracy))
+                if validation_accuracy >= best_accuracy:
+                    best_saver.save(sess, best_model_path)
+                    best_accuracy = validation_accuracy
+                    steps_since_last_improvement = 0
+                else:
+                    steps_since_last_improvement += 1
                 train_writer.add_summary(train_summary_str, step)
                 validation_writer.add_summary(validation_summary_str, step)
+
 
             # Save the model checkpoint periodically.
             if (step + 1) % FLAGS.save_model_frequency == 0 or (step + 1) == FLAGS.max_steps:
@@ -265,6 +277,9 @@ def main(_):
             if (step + 1) % FLAGS.flush_frequency == 0:
                 train_writer.flush()
                 validation_writer.flush()
+            if steps_since_last_improvement >= FLAGS.early_stop_epochs:
+                print('Stopping early')
+                break
 
         # Resetting the internal batch indexes
         evaluated_images = 0
@@ -272,7 +287,7 @@ def main(_):
         batch_count = 0
 
         gtsrb.reset()
-
+        best_saver.restore(sess, best_model_path)
         while evaluated_images != gtsrb.nTestSamples:
             # Don't loop back when we reach the end of the test set
             (testImages, testLabels) = gtsrb.get_test_batch(allow_smaller_batches=True)
