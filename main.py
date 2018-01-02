@@ -242,9 +242,8 @@ def main(_):
                 train_writer.flush()
                 validation_writer.flush()
             if steps_since_last_improvement >= FLAGS.early_stop_epochs:
-                continue
-                #print('Stopping early')
-                #break
+                print('Stopping early')
+                break
 
         # Resetting the internal batch indexes
         evaluated_images = 0
