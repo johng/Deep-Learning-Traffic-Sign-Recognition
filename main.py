@@ -8,6 +8,7 @@ import GTSRB as GT
 import tensorflow as tf
 import random
 from tensorflow.python.client import timeline
+from itertools import izip
 
 here = os.path.dirname(__file__)
 sys.path.append(here)
@@ -24,9 +25,9 @@ tf.app.flags.DEFINE_string('log-dir', '{cwd}/logs/'.format(cwd=os.getcwd()),
 # Optimisation hyperparameters
 tf.app.flags.DEFINE_integer('max-steps', 10000,
                             'Number of mini-batches to train on. (default: %(default)d)')
-tf.app.flags.DEFINE_integer('batch-size', 50, 'Number of examples per mini-batch. (default: %(default)d)')
+tf.app.flags.DEFINE_integer('batch-size', 100, 'Number of examples per mini-batch. (default: %(default)d)')
 tf.app.flags.DEFINE_float('learning-rate', 0.01, 'Number of examples to run. (default: %(default)d)')
-tf.app.flags.DEFINE_float('dropout-keep-rate', 0.8, 'Fraction of connections to keep. (default: %(default)d')
+tf.app.flags.DEFINE_float('dropout-keep-rate', 0.7, 'Fraction of connections to keep. (default: %(default)d')
 tf.app.flags.DEFINE_integer('early-stop-epochs', 20, 'Number of steps without improvement before stopping. (default: %(default)d')
 
 # Graph Options
@@ -130,12 +131,13 @@ def deepnn(x_image, output=43):
     conv4_bn = tf.nn.relu(tf.layers.batch_normalization(conv4, fused=True))
     pool4_drop = tf.nn.dropout(conv4_bn, FLAGS.dropout_keep_rate)
 
+    # Multi-Scale features - fast forward earlier layer results
     pool1_flat = tf.contrib.layers.flatten(pool1)
     pool2_flat = tf.contrib.layers.flatten(pool2)
     pool3_flat = tf.contrib.layers.flatten(pool3)
     pool4_flat = tf.contrib.layers.flatten(conv4_bn)
 
-    full_pool = tf.concat([pool1_flat, pool2_flat, pool3_flat, pool4_flat], axis=1)
+    full_pool = tf.nn.dropout(tf.concat([pool1_flat, pool2_flat, pool3_flat, pool4_flat], axis=1), FLAGS.dropout_keep_rate)
     logits = tf.layers.dense(inputs=full_pool,
                              units=output,
                              kernel_regularizer=weight_decay,
@@ -148,56 +150,15 @@ def deepnn(x_image, output=43):
 def main(_):
     tf.reset_default_graph()
 
-    gtsrb = GT.gtsrb(batch_size=FLAGS.batch_size)
+    gtsrb = GT.gtsrb(batch_size=FLAGS.batch_size, use_extended=True, generate_extended=False)
     augment = tf.placeholder(tf.bool)
     # Build the graph for the deep net
     with tf.name_scope('inputs'):
         y_ = tf.placeholder(tf.float32, [None, gtsrb.OUTPUT])
         x = tf.placeholder(tf.float32, [None, gtsrb.WIDTH * gtsrb.HEIGHT * gtsrb.CHANNELS])
         x_image = tf.reshape(x, [-1, gtsrb.WIDTH, gtsrb.HEIGHT, gtsrb.CHANNELS])
-        transform = tf.map_fn(lambda v: tf.image.random_flip_up_down(v), x_image)
-
-        flip_invariant_classes = tf.constant([17, 12, 13, 15, 35])
-        # Transformations as listed in http://ieeexplore.ieee.org/stamp/stamp.jsp?tp=&arnumber=6033589
-        # random rotation -15,15 degrees
-        def random_rotate(): return tf.map_fn(lambda img: tf.contrib.image.rotate(img, random.uniform(-0.26, 0.26)),
-                                              x_image)
-
-        # random translation -2,2 pixels
-        def random_translate():
-            return tf.map_fn(lambda img: tf.contrib.image.transform(img, [1, 0, random.randint(-2, 2), 0, 1,
-                                                                          random.randint(-2, 2), 0, 0]), x_image)
-        def rotate_and_extend():
-            x_image_rotated = random_rotate()
-            x_image_extended = tf.concat([x_image, x_image_rotated],0)
-            y_extended = tf.concat([y_, y_],0)
-            return x_image_extended, y_extended
-
-        def flip_valid(image, label):
-            label_idx = tf.argmax(label, output_type=tf.int32)
-            is_valid = tf.foldl(lambda a, b: a | b, tf.equal(label_idx, flip_invariant_classes))
-            return tf.cond(is_valid, lambda: tf.image.flip_left_right(image), lambda: tf.identity(image))
-
-        def flip_valid_and_extend():
-            x_images = tf.unstack(x_image, num=FLAGS.batch_size)
-            labels = tf.unstack(y_, num=FLAGS.batch_size)
-            flipped = []
-            for idx, img in enumerate(x_images):
-                flipped.append(flip_valid(img, labels[idx]))
-            x_image_flipped = tf.stack(flipped)
-            x_image_extended = tf.concat([x_image, x_image_flipped], 0)
-            y_extended = tf.concat([y_, y_], 0)
-            return x_image_extended, y_extended
-
-
-        #We can also flip images whose class is invariant to flips
-        #Can also flip & reclassify where applicable
-        x_image, y_ = tf.cond(augment, flip_valid_and_extend, lambda: (tf.identity(x_image), tf.identity(y_)))
-        x_image, y_ = tf.cond(augment, rotate_and_extend, lambda: (tf.identity(x_image), tf.identity(y_)))
-        #x_image = tf.cond(augment, random_translate, lambda: tf.identity(x_image))
         x_image = tf.map_fn(lambda img: tf.image.per_image_standardization(img), x_image)
         x_image = tf.map_fn(lambda img: tf.image.rgb_to_hsv(img), x_image)
-
 
     with tf.name_scope('model'):
         y_conv = deepnn(x_image)
@@ -245,10 +206,12 @@ def main(_):
 
         best_accuracy = 0
         steps_since_last_improvement = 0
+        test_batch_generator = gtsrb.batch_generator('test', batch_size=FLAGS.batch_size)
+        train_batch_generator = gtsrb.batch_generator('train', batch_size=FLAGS.batch_size)
+
         # Training and validation
         for step in range(FLAGS.max_steps):
-            (trainImages, trainLabels) = gtsrb.get_train_batch()
-            (testImages, testLabels) = gtsrb.get_test_batch()
+            (trainImages, trainLabels) = train_batch_generator.next()
             # rotated_training_images = sess.run([rotation], feed_dict={x_image: trainImages})
             _, train_summary_str = sess.run([train_step, train_summary],
                                             feed_dict={x_image: trainImages, y_: trainLabels, augment: True},
@@ -256,6 +219,7 @@ def main(_):
 
             # Validation: Monitoring accuracy using validation set
             if (step + 1) % FLAGS.log_frequency == 0:
+                (testImages, testLabels) = test_batch_generator.next()
                 validation_accuracy, validation_summary_str = sess.run([accuracy, validation_summary],
                                                                        feed_dict={x_image: testImages, y_: testLabels,
                                                                                   augment: False})
@@ -278,8 +242,9 @@ def main(_):
                 train_writer.flush()
                 validation_writer.flush()
             if steps_since_last_improvement >= FLAGS.early_stop_epochs:
-                print('Stopping early')
-                break
+                continue
+                #print('Stopping early')
+                #break
 
         # Resetting the internal batch indexes
         evaluated_images = 0
@@ -288,14 +253,13 @@ def main(_):
 
         gtsrb.reset()
         best_saver.restore(sess, best_model_path)
-        while evaluated_images != gtsrb.nTestSamples:
-            # Don't loop back when we reach the end of the test set
-            (testImages, testLabels) = gtsrb.get_test_batch(allow_smaller_batches=True)
+        test_batch_generator = gtsrb.batch_generator('test', batch_size=FLAGS.batch_size, limit=True)
+        for (testImages, testLabels) in test_batch_generator:
             test_accuracy_temp = sess.run(accuracy, feed_dict={x_image: testImages, y_: testLabels, augment: False})
 
             batch_count += 1
             test_accuracy += test_accuracy_temp
-            evaluated_images += testLabels.shape[0]
+            evaluated_images += len(testLabels)
 
         test_accuracy = test_accuracy / batch_count
         print('test set: accuracy on test set: %0.3f' % test_accuracy)
