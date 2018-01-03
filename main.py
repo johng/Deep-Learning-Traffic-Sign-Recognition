@@ -18,17 +18,17 @@ tf.app.flags.DEFINE_integer('log-frequency', 100,
                             'Number of steps between logging results to the console and saving summaries. (default: %(default)d)')
 tf.app.flags.DEFINE_integer('flush-frequency', 50,
                             'Number of steps between flushing summary results. (default: %(default)d)')
-tf.app.flags.DEFINE_integer('save-model-frequency', 100,
+tf.app.flags.DEFINE_integer('save-model-frequency', 5,
                             'Number of steps between model saves. (default: %(default)d)')
 tf.app.flags.DEFINE_string('log-dir', '{cwd}/logs/'.format(cwd=os.getcwd()),
                            'Directory where to write event logs and checkpoint. (default: %(default)s)')
 # Optimisation hyperparameters
-tf.app.flags.DEFINE_integer('max-steps', 10000,
-                            'Number of mini-batches to train on. (default: %(default)d)')
+tf.app.flags.DEFINE_integer('max-epochs', 50,
+                            'Number of iterations of batch training. (default: %(default)d)')
 tf.app.flags.DEFINE_integer('batch-size', 100, 'Number of examples per mini-batch. (default: %(default)d)')
 tf.app.flags.DEFINE_float('learning-rate', 0.01, 'Number of examples to run. (default: %(default)d)')
 tf.app.flags.DEFINE_float('dropout-keep-rate', 0.7, 'Fraction of connections to keep. (default: %(default)d')
-tf.app.flags.DEFINE_integer('early-stop-epochs', 20, 'Number of steps without improvement before stopping. (default: %(default)d')
+tf.app.flags.DEFINE_integer('early-stop-epochs', 10, 'Number of steps without improvement before stopping. (default: %(default)d')
 
 # Graph Options
 tf.app.flags.DEFINE_bool('data-augment', True, 'Add randomized rotation and flipping to training data')
@@ -70,8 +70,6 @@ def deepnn(x_image, output=43):
         name='pool1'
     )
 
-    pool1_drop = tf.nn.dropout(pool1, FLAGS.dropout_keep_rate)
-
     conv2 = tf.layers.conv2d(
         inputs=pool1,
         filters=32,
@@ -92,8 +90,6 @@ def deepnn(x_image, output=43):
         padding='valid',
         name='pool2'
     )
-    pool2_drop = tf.nn.dropout(pool2, FLAGS.dropout_keep_rate)
-
 
     conv3 = tf.layers.conv2d(
         inputs=pool2,
@@ -115,11 +111,9 @@ def deepnn(x_image, output=43):
         padding='valid',
         name='pool3'
     )
-    pool3_drop = tf.nn.dropout(pool3, FLAGS.dropout_keep_rate)
-
 
     conv4 = tf.layers.conv2d(
-        inputs=pool3_drop,
+        inputs=pool3,
         filters=64,
         kernel_size=[4, 4],
         padding='valid',
@@ -129,15 +123,14 @@ def deepnn(x_image, output=43):
         name='conv4'
     )
     conv4_bn = tf.nn.relu(tf.layers.batch_normalization(conv4, fused=False))
-    pool4_drop = tf.nn.dropout(conv4_bn, FLAGS.dropout_keep_rate)
 
     # Multi-Scale features - fast forward earlier layer results
     pool1_flat = tf.contrib.layers.flatten(pool1)
     pool2_flat = tf.contrib.layers.flatten(pool2)
     pool3_flat = tf.contrib.layers.flatten(pool3)
-    pool4_flat = tf.contrib.layers.flatten(conv4_bn)
+    conv4_flat = tf.contrib.layers.flatten(conv4_bn)
 
-    full_pool = tf.nn.dropout(tf.concat([pool1_flat, pool2_flat, pool3_flat, pool4_flat], axis=1), FLAGS.dropout_keep_rate)
+    full_pool = tf.nn.dropout(tf.concat([pool1_flat, pool2_flat, pool3_flat, conv4_flat], axis=1), FLAGS.dropout_keep_rate)
     logits = tf.layers.dense(inputs=full_pool,
                              units=output,
                              kernel_regularizer=weight_decay,
@@ -168,8 +161,8 @@ def main(_):
     accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32), name='accuracy')
 
     global_step = tf.Variable(0, trainable=False)  # this will be incremented automatically by tensorflow
-    decay_steps = 1000  # decay the learning rate every 1000 steps
-    decay_rate = 0.9  # the base of our exponential for the decay
+    decay_steps = 10000  # decay the learning rate every 1000 steps
+    decay_rate = 0.95  # the base of our exponential for the decay
     decayed_learning_rate = tf.train.exponential_decay(FLAGS.learning_rate, global_step,
                                                        decay_steps, decay_rate, staircase=True)
 
@@ -206,36 +199,42 @@ def main(_):
 
         best_accuracy = 0
         steps_since_last_improvement = 0
-        test_batch_generator = gtsrb.batch_generator('test', batch_size=FLAGS.batch_size)
-        train_batch_generator = gtsrb.batch_generator('train', batch_size=FLAGS.batch_size)
+        #Batch generator used for validation
 
         # Training and validation
-        for step in range(FLAGS.max_steps):
-            (trainImages, trainLabels) = train_batch_generator.next()
+        for step in range(FLAGS.max_epochs):
+            #Batch generator used for training in each epoch
+            train_batch_generator = gtsrb.batch_generator('train', batch_size=FLAGS.batch_size, limit=True)
             # rotated_training_images = sess.run([rotation], feed_dict={x_image: trainImages})
-            _, train_summary_str = sess.run([train_step, train_summary],
-                                            feed_dict={x_image: trainImages, y_: trainLabels, augment: True},
-                                            options=options, run_metadata=run_metadata)
+            for (trainImages, trainLabels) in train_batch_generator:
+                _, train_summary_str = sess.run([train_step, train_summary],
+                                                feed_dict={x_image: trainImages, y_: trainLabels, augment: True},
+                                                options=options, run_metadata=run_metadata)
 
+            validation_batch_generator = gtsrb.batch_generator('test', batch_size=FLAGS.batch_size, limit=True)
             # Validation: Monitoring accuracy using validation set
-            if (step + 1) % FLAGS.log_frequency == 0:
-                (testImages, testLabels) = test_batch_generator.next()
+            total_validation_accuracy = 0
+            validation_batches = 0
+            for (testImages, testLabels) in validation_batch_generator:
                 validation_accuracy, validation_summary_str = sess.run([accuracy, validation_summary],
                                                                        feed_dict={x_image: testImages, y_: testLabels,
                                                                                   augment: False})
-                print('step {}, accuracy on validation set : {}'.format(step + 1, validation_accuracy))
-                if validation_accuracy >= best_accuracy:
-                    best_saver.save(sess, best_model_path)
-                    best_accuracy = validation_accuracy
-                    steps_since_last_improvement = 0
-                else:
-                    steps_since_last_improvement += 1
-                train_writer.add_summary(train_summary_str, step)
-                validation_writer.add_summary(validation_summary_str, step)
+                total_validation_accuracy += validation_accuracy
+                validation_batches += 1
+            validation_accuracy = total_validation_accuracy / validation_batches
+            print('step {}, accuracy on validation set : {}'.format(step + 1, validation_accuracy))
+            if validation_accuracy >= best_accuracy:
+                best_saver.save(sess, best_model_path)
+                best_accuracy = validation_accuracy
+                steps_since_last_improvement = 0
+            else:
+                steps_since_last_improvement += 1
+            train_writer.add_summary(train_summary_str, step)
+            validation_writer.add_summary(validation_summary_str, step)
 
 
             # Save the model checkpoint periodically.
-            if (step + 1) % FLAGS.save_model_frequency == 0 or (step + 1) == FLAGS.max_steps:
+            if (step + 1) % FLAGS.save_model_frequency == 0 or (step + 1) == FLAGS.max_epochs:
                 saver.save(sess, checkpoint_path, global_step=step)
 
             if (step + 1) % FLAGS.flush_frequency == 0:
