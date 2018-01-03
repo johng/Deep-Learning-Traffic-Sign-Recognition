@@ -223,7 +223,7 @@ def main(_):
                 total_validation_accuracy += validation_accuracy
                 validation_batches += 1
             validation_accuracy = total_validation_accuracy / validation_batches
-            print('step {}, accuracy on validation set : {}'.format(step + 1, validation_accuracy))
+            print('epoch {}, accuracy on validation set : {}'.format(step + 1, validation_accuracy))
             if validation_accuracy >= best_accuracy:
                 best_saver.save(sess, best_model_path)
                 best_accuracy = validation_accuracy
