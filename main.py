@@ -152,6 +152,7 @@ def main(_):
         x_image = tf.reshape(x, [-1, gtsrb.WIDTH, gtsrb.HEIGHT, gtsrb.CHANNELS])
         x_image = tf.map_fn(lambda img: tf.image.per_image_standardization(img), x_image)
         x_image = tf.map_fn(lambda img: tf.image.rgb_to_hsv(img), x_image)
+        global_epoch = tf.placeholder(tf.int32)
 
     with tf.name_scope('model'):
         y_conv = deepnn(x_image)
@@ -161,9 +162,9 @@ def main(_):
     accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32), name='accuracy')
 
     global_step = tf.Variable(0, trainable=False)  # this will be incremented automatically by tensorflow
-    decay_steps = 10000  # decay the learning rate every 1000 steps
-    decay_rate = 0.95  # the base of our exponential for the decay
-    decayed_learning_rate = tf.train.exponential_decay(FLAGS.learning_rate, global_step,
+    decay_steps = 10  # decay the learning rate every 1000 steps
+    decay_rate = 0.9     # the base of our exponential for the decay
+    decayed_learning_rate = tf.train.exponential_decay(FLAGS.learning_rate, global_epoch,
                                                        decay_steps, decay_rate, staircase=True)
 
     # We need to update the dependencies of the minimization op so that it all ops in the `UPDATE_OPS`
@@ -208,10 +209,10 @@ def main(_):
             # rotated_training_images = sess.run([rotation], feed_dict={x_image: trainImages})
             for (trainImages, trainLabels) in train_batch_generator:
                 _, train_summary_str = sess.run([train_step, train_summary],
-                                                feed_dict={x_image: trainImages, y_: trainLabels, augment: True},
+                                                feed_dict={x_image: trainImages, y_: trainLabels, augment: True, global_epoch: step},
                                                 options=options, run_metadata=run_metadata)
 
-            validation_batch_generator = gtsrb.batch_generator('test', batch_size=FLAGS.batch_size, limit=True)
+            validation_batch_generator = gtsrb.batch_generator('test', batch_size=FLAGS.batch_size, limit=True, fraction=1.0)
             # Validation: Monitoring accuracy using validation set
             total_validation_accuracy = 0
             validation_batches = 0

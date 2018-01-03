@@ -91,7 +91,7 @@ class gtsrb:
         self.pTrain = np.random.permutation(self.nTrainSamples)
         self.pTest = np.random.permutation(self.nTestSamples)
 
-    def batch_generator(self, group, batch_size=50, limit=False):
+    def batch_generator(self, group, batch_size=50, limit=False, fraction=1):
 
         idx = 0
         data = self.trainData if group == 'train' else self.testData
@@ -100,7 +100,7 @@ class gtsrb:
         dataset_size = labels.shape[0]
         indices = range(dataset_size)
         np.random.shuffle(indices)
-        while idx < dataset_size:
+        while idx < dataset_size*fraction:
             chunk = slice(idx, idx + batch_size)
             chunk = indices[chunk]
             idx = idx + batch_size
