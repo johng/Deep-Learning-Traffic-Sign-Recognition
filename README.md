@@ -1,9 +1,20 @@
+# Deep Learning Traffic Sign Recogniser
 
-# Architecture
+[Zhang et al. A Shallow Network with Combined Pooling for Fast Traffic Sign Recognition](http://www.mdpi.com/2078-2489/8/2/45/htm)
 
-Layers
+## Setup
 
+```
+curl https://raw.githubusercontent.com/mitsuhiko/pipsi/master/get-pipsi.py | python
+pipsi install pew
+pip install pipenv --user
+pipenv --site-packages  # initialises virtualenv with access to system installation of Tensorflow
+pipenv install  # installs packages listed in Pipfile.lock 
+```
 
+## Architecture
+
+### Layers
 
 **Layer**|**Name**|**Kernel**|**Stride**|**Padding**|**Output**
 :-----:|:-----:|:-----:|:-----:|:-----:|:-----:

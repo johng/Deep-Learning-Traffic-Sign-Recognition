@@ -41,7 +41,7 @@ checkpoint_path = os.path.join(run_log_dir, 'model.ckpt')
 best_model_path = os.path.join('{cwd}/logs/best'.format(cwd=os.getcwd()), 'model.ckpt')
 
 # limit the process memory to a third of the total gpu memory
-gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.8)
+gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.4)
 
 
 def deepnn(x_image, output=43):
@@ -60,7 +60,7 @@ def deepnn(x_image, output=43):
         kernel_regularizer=weight_decay,
         name='conv1'
     )
-    conv1_bn = tf.nn.crelu(tf.layers.batch_normalization(conv1, fused=False))
+    conv1_bn = tf.nn.crelu(tf.layers.batch_normalization(conv1))
     conv1_bn_pad = tf.pad(conv1_bn, padding_pooling, "CONSTANT")
     pool1 = tf.layers.average_pooling2d(
         inputs=conv1_bn_pad,
@@ -81,7 +81,7 @@ def deepnn(x_image, output=43):
         kernel_regularizer=weight_decay,
         name='conv2'
     )
-    conv2_bn = tf.nn.crelu(tf.layers.batch_normalization(conv2, fused=False))
+    conv2_bn = tf.nn.crelu(tf.layers.batch_normalization(conv2))
     conv2_bn_pad = tf.pad(conv2_bn, padding_pooling, "CONSTANT")
     pool2 = tf.layers.max_pooling2d(
         inputs=conv2_bn_pad,
@@ -102,7 +102,7 @@ def deepnn(x_image, output=43):
         kernel_regularizer=weight_decay,
         name='conv3'
     )
-    conv3_bn = tf.nn.crelu(tf.layers.batch_normalization(conv3, fused=False))
+    conv3_bn = tf.nn.crelu(tf.layers.batch_normalization(conv3))
     conv3bn_pad = tf.pad(conv3_bn, padding_pooling, "CONSTANT")
     pool3 = tf.layers.max_pooling2d(
         inputs=conv3bn_pad,
@@ -122,7 +122,7 @@ def deepnn(x_image, output=43):
         use_bias=False,
         name='conv4'
     )
-    conv4_bn = tf.nn.relu(tf.layers.batch_normalization(conv4, fused=False))
+    conv4_bn = tf.nn.relu(tf.layers.batch_normalization(conv4))
 
     # Multi-Scale features - fast forward earlier layer results
     pool1_flat = tf.contrib.layers.flatten(pool1)
@@ -143,7 +143,7 @@ def deepnn(x_image, output=43):
 def main(_):
     tf.reset_default_graph()
 
-    gtsrb = GT.gtsrb(batch_size=FLAGS.batch_size, use_extended=True, generate_extended=False)
+    gtsrb = GT.gtsrb(batch_size=FLAGS.batch_size, use_extended=False, generate_extended=True)
     augment = tf.placeholder(tf.bool)
     # Build the graph for the deep net
     with tf.name_scope('inputs'):
