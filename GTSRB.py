@@ -22,8 +22,8 @@ class gtsrb:
             self.trainData = extended['arr_0']
             self.trainLabels = extended['arr_1']
             #assert np.all(t_a, t_b)
-            print("Exetended dataset {}".format(self.trainData.shape))
-            print("Exetended labels {}".format(self.trainLabels.shape))
+            print("Extended dataset {}".format(self.trainData.shape))
+            print("Extended labels {}".format(self.trainLabels.shape))
         else:
             self.trainData = dataset['X_{0:s}'.format('train')]
             self.trainLabels = dataset['y_{0:s}'.format('train')]

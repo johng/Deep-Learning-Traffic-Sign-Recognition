@@ -6,9 +6,7 @@ import sys
 import os
 import GTSRB as GT
 import tensorflow as tf
-import random
 from tensorflow.python.client import timeline
-from itertools import izip
 
 here = os.path.dirname(__file__)
 sys.path.append(here)
@@ -32,8 +30,12 @@ tf.app.flags.DEFINE_integer('early-stop-epochs', 10, 'Number of steps without im
 
 # Graph Options
 tf.app.flags.DEFINE_bool('data-augment', True, 'Add randomized rotation and flipping to training data')
-
 tf.app.flags.DEFINE_bool('use-profile', False, 'Record trace timeline data')
+
+# Execution environment options
+tf.app.flags.DEFINE_float('gpu-memory-fraction', 0.8, 'Fraction of the GPU\'s memory to use')
+tf.app.flags.DEFINE_bool('generate-augmented-data', False, 'Whether to generate augmented data on this run')
+tf.app.flags.DEFINE_bool('use-augmented-data', True, 'Whether to use pre-existing augmented data on this run')
 
 run_log_dir = os.path.join(FLAGS.log_dir, 'exp_bs_{bs}_lr_{lr}'.format(bs=FLAGS.batch_size, lr=FLAGS.learning_rate))
 
@@ -41,7 +43,7 @@ checkpoint_path = os.path.join(run_log_dir, 'model.ckpt')
 best_model_path = os.path.join('{cwd}/logs/best'.format(cwd=os.getcwd()), 'model.ckpt')
 
 # limit the process memory to a third of the total gpu memory
-gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.4)
+gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=FLAGS.gpu_memory_fraction)
 
 
 def deepnn(x_image, output=43):
@@ -142,8 +144,7 @@ def deepnn(x_image, output=43):
 
 def main(_):
     tf.reset_default_graph()
-    # todo: improve running with use_extended/generate_extended flags
-    gtsrb = GT.gtsrb(batch_size=FLAGS.batch_size, use_extended=True, generate_extended=False)
+    gtsrb = GT.gtsrb(batch_size=FLAGS.batch_size, use_extended=FLAGS.use_augmented_data, generate_extended=FLAGS.generate_augmented_data)
     augment = tf.placeholder(tf.bool)
     # Build the graph for the deep net
     with tf.name_scope('inputs'):
