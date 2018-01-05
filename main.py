@@ -142,8 +142,8 @@ def deepnn(x_image, output=43):
 
 def main(_):
     tf.reset_default_graph()
-
-    gtsrb = GT.gtsrb(batch_size=FLAGS.batch_size, use_extended=False, generate_extended=True)
+    # todo: improve running with use_extended/generate_extended flags
+    gtsrb = GT.gtsrb(batch_size=FLAGS.batch_size, use_extended=True, generate_extended=False)
     augment = tf.placeholder(tf.bool)
     # Build the graph for the deep net
     with tf.name_scope('inputs'):
