@@ -1,5 +1,4 @@
 import numpy as np
-import tensorflow as tf
 import imgaug as ia
 from imgaug import augmenters as iaa
 from matplotlib import pyplot as plt
@@ -45,7 +44,7 @@ class gtsrb:
         self.currentIndexTest = 0
         self.currentIndexTrain = 0
 
-    def augment_images_2(self, images, classes):
+    def augment_images(self, images, classes):
         seq = iaa.SomeOf(2, [
             iaa.CropAndPad(
                 px=((0, 10), (0, 10), (0, 10), (0, 10)),
@@ -62,7 +61,7 @@ class gtsrb:
             iaa.PerspectiveTransform(scale=(0.01, 0.2))
         ], random_order=True)
 
-        augmented_images = seq.augment_images(images*255)
+        augmented_images = seq.augment_images(images*255.0)
 
         # set SCIPY_PIL_IMAGE_VIEWER env variable to an image viewer executable
         #seq.show_grid((images*255)[2000], rows=8, cols=8)
@@ -78,21 +77,21 @@ class gtsrb:
         # b.imshow(augmented_images[3], interpolation='nearest')
         # plt.show()
 
-        return np.concatenate((images, augmented_images)), np.concatenate((classes, classes))
+        return np.concatenate((images, augmented_images/255.0)), np.concatenate((classes, classes))
 
-    def augment_images(self, images, classes):
-        sess = tf.Session()
-        x_image = tf.placeholder(tf.float32, [None, gtsrb.WIDTH, gtsrb.HEIGHT, gtsrb.CHANNELS])
-        rotate_images = tf.map_fn(lambda x: tf.contrib.image.rotate(x, tf.random_uniform([], -0.26, 0.26)), x_image)
-        translate_images = tf.map_fn(lambda x: tf.contrib.image.transform(x, [1, 0,
-                                                                              tf.random_uniform([], -2, 2), 0, 1,
-                                                                              tf.random_uniform([], -2, 2), 0, 0]),
-                                     x_image)
-
-        augmented_data = tf.concat([x_image, rotate_images, translate_images], axis=0)
-        extended_data = sess.run(augmented_data, feed_dict={x_image: images})
-        sess.close()
-        return extended_data, np.concatenate((classes, classes, classes))
+    # def augment_images(self, images, classes):
+    #     sess = tf.Session()
+    #     x_image = tf.placeholder(tf.float32, [None, gtsrb.WIDTH, gtsrb.HEIGHT, gtsrb.CHANNELS])
+    #     rotate_images = tf.map_fn(lambda x: tf.contrib.image.rotate(x, tf.random_uniform([], -0.26, 0.26)), x_image)
+    #     translate_images = tf.map_fn(lambda x: tf.contrib.image.transform(x, [1, 0,
+    #                                                                           tf.random_uniform([], -2, 2), 0, 1,
+    #                                                                           tf.random_uniform([], -2, 2), 0, 0]),
+    #                                  x_image)
+    #
+    #     augmented_data = tf.concat([x_image, rotate_images, translate_images], axis=0)
+    #     extended_data = sess.run(augmented_data, feed_dict={x_image: images})
+    #     sess.close()
+    #     return extended_data, np.concatenate((classes, classes, classes))
 
     def generate_extended_set(self):
         h_flip_invariant_classes = [17, 12, 13, 15, 35]
@@ -113,7 +112,7 @@ class gtsrb:
 
         # extended_trainData = np.concatenate((self.trainData, np.array(new_trainData)), axis=0)
         # extended_trainLabels = np.concatenate((self.trainLabels, np.array(new_trainLabels)), axis=0)
-        augmented_images, augmented_labels = self.augment_images_2(self.trainData, self.trainLabels)
+        augmented_images, augmented_labels = self.augment_images(self.trainData, self.trainLabels)
         print("Extended dataset from {} to {}".format(self.trainData.shape, augmented_images.shape))
         print("Extended labels from {} to {}".format(self.trainLabels.shape, augmented_labels.shape))
         np.savez('extended_dataset', augmented_images, augmented_labels)
