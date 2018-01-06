@@ -12,6 +12,21 @@ class gtsrb:
     CHANNELS = 3
     OUTPUT = 43
     nTestSamples = 200
+    augmentation_sequence = iaa.SomeOf(2, [
+        iaa.CropAndPad(
+            px=((0, 10), (0, 10), (0, 10), (0, 10)),
+            pad_mode=ia.ALL,
+            pad_cval=(0, 128)
+        ),
+        # iaa.Sequential([
+        #     iaa.ChangeColorspace(from_colorspace='RGB', to_colorspace='YCrCb'),
+        #     iaa.WithChannels(0, iaa.Add((-30, 30))),
+        #     iaa.ChangeColorspace(from_colorspace='YCrCb', to_colorspace='RGB')
+        # ]),
+        iaa.AdditiveGaussianNoise(scale=(0, 0.05 * 255)),
+        iaa.AverageBlur(k=((4, 8), (1, 3))),
+        iaa.PerspectiveTransform(scale=(0.01, 0.2))
+    ], random_order=True)
 
     def __init__(self, batch_size=128, use_extended=False, generate_extended=False):
 
@@ -45,53 +60,12 @@ class gtsrb:
         self.currentIndexTrain = 0
 
     def augment_images(self, images, classes):
-        seq = iaa.SomeOf(2, [
-            iaa.CropAndPad(
-                px=((0, 10), (0, 10), (0, 10), (0, 10)),
-                pad_mode=ia.ALL,
-                pad_cval=(0,128)
-            ),
-            # iaa.Sequential([
-            #     iaa.ChangeColorspace(from_colorspace='RGB', to_colorspace='YCrCb'),
-            #     iaa.WithChannels(0, iaa.Add((-30, 30))),
-            #     iaa.ChangeColorspace(from_colorspace='YCrCb', to_colorspace='RGB')
-            # ]),
-            iaa.AdditiveGaussianNoise(scale=(0, 0.03*255)),
-            iaa.AverageBlur(k=((4,8), (1,3))),
-            iaa.PerspectiveTransform(scale=(0.01, 0.2))
-        ], random_order=True)
+        augmented_images = self.augmentation_sequence.augment_images(images * 255.0)
+        return np.concatenate((images, augmented_images / 255.0)), np.concatenate((classes, classes))
 
-        augmented_images = seq.augment_images(images*255.0)
-
+    def view_augmented_image(self, images, idx):
         # set SCIPY_PIL_IMAGE_VIEWER env variable to an image viewer executable
-        #seq.show_grid((images*255)[2000], rows=8, cols=8)
-
-        # fig = plt.figure()
-        # a = fig.add_subplot(2, 2, 1)
-        # a.imshow(augmented_images[0], interpolation='nearest')
-        # b = fig.add_subplot(2, 2, 2)
-        # b.imshow(augmented_images[1], interpolation='nearest')
-        # b = fig.add_subplot(2, 2, 3)
-        # b.imshow(augmented_images[2], interpolation='nearest')
-        # b = fig.add_subplot(2, 2, 4)
-        # b.imshow(augmented_images[3], interpolation='nearest')
-        # plt.show()
-
-        return np.concatenate((images, augmented_images/255.0)), np.concatenate((classes, classes))
-
-    # def augment_images(self, images, classes):
-    #     sess = tf.Session()
-    #     x_image = tf.placeholder(tf.float32, [None, gtsrb.WIDTH, gtsrb.HEIGHT, gtsrb.CHANNELS])
-    #     rotate_images = tf.map_fn(lambda x: tf.contrib.image.rotate(x, tf.random_uniform([], -0.26, 0.26)), x_image)
-    #     translate_images = tf.map_fn(lambda x: tf.contrib.image.transform(x, [1, 0,
-    #                                                                           tf.random_uniform([], -2, 2), 0, 1,
-    #                                                                           tf.random_uniform([], -2, 2), 0, 0]),
-    #                                  x_image)
-    #
-    #     augmented_data = tf.concat([x_image, rotate_images, translate_images], axis=0)
-    #     extended_data = sess.run(augmented_data, feed_dict={x_image: images})
-    #     sess.close()
-    #     return extended_data, np.concatenate((classes, classes, classes))
+        self.augmentation_sequence.show_grid((images*255)[idx], rows=8, cols=8)
 
     def generate_extended_set(self):
         h_flip_invariant_classes = [17, 12, 13, 15, 35]
@@ -167,4 +141,4 @@ class gtsrb:
 
 if __name__ == '__main__':
     data = gtsrb()
-    data.augment_images_2(data.trainData, data.trainLabels)
+    data.view_augmented_image(data.trainData, 1000)
