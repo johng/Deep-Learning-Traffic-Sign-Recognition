@@ -1,7 +1,11 @@
 import numpy as np
-import sys
 import tensorflow as tf
-import random
+import imgaug as ia
+from imgaug import augmenters as iaa
+from matplotlib import pyplot as plt
+
+ia.seed(1)
+
 
 class gtsrb:
     WIDTH = 32
@@ -21,7 +25,7 @@ class gtsrb:
             extended = np.load('extended_dataset.npz')
             self.trainData = extended['arr_0']
             self.trainLabels = extended['arr_1']
-            #assert np.all(t_a, t_b)
+            # assert np.all(t_a, t_b)
             print("Extended dataset {}".format(self.trainData.shape))
             print("Extended labels {}".format(self.trainLabels.shape))
         else:
@@ -41,18 +45,54 @@ class gtsrb:
         self.currentIndexTest = 0
         self.currentIndexTrain = 0
 
+    def augment_images_2(self, images, classes):
+        seq = iaa.SomeOf(2, [
+            iaa.CropAndPad(
+                px=((0, 10), (0, 10), (0, 10), (0, 10)),
+                pad_mode=ia.ALL,
+                pad_cval=(0,128)
+            ),
+            # iaa.Sequential([
+            #     iaa.ChangeColorspace(from_colorspace='RGB', to_colorspace='YCrCb'),
+            #     iaa.WithChannels(0, iaa.Add((-30, 30))),
+            #     iaa.ChangeColorspace(from_colorspace='YCrCb', to_colorspace='RGB')
+            # ]),
+            iaa.AdditiveGaussianNoise(scale=(0, 0.03*255)),
+            iaa.AverageBlur(k=((4,8), (1,3))),
+            iaa.PerspectiveTransform(scale=(0.01, 0.2))
+        ], random_order=True)
+
+        augmented_images = seq.augment_images(images*255)
+
+        # set SCIPY_PIL_IMAGE_VIEWER env variable to an image viewer executable
+        #seq.show_grid((images*255)[2000], rows=8, cols=8)
+
+        # fig = plt.figure()
+        # a = fig.add_subplot(2, 2, 1)
+        # a.imshow(augmented_images[0], interpolation='nearest')
+        # b = fig.add_subplot(2, 2, 2)
+        # b.imshow(augmented_images[1], interpolation='nearest')
+        # b = fig.add_subplot(2, 2, 3)
+        # b.imshow(augmented_images[2], interpolation='nearest')
+        # b = fig.add_subplot(2, 2, 4)
+        # b.imshow(augmented_images[3], interpolation='nearest')
+        # plt.show()
+
+        return np.concatenate((images, augmented_images)), np.concatenate((classes, classes))
+
     def augment_images(self, images, classes):
         sess = tf.Session()
         x_image = tf.placeholder(tf.float32, [None, gtsrb.WIDTH, gtsrb.HEIGHT, gtsrb.CHANNELS])
-        rotate_images = tf.map_fn(lambda x: tf.contrib.image.rotate(x, tf.random_uniform([],-0.26, 0.26)), x_image)
+        rotate_images = tf.map_fn(lambda x: tf.contrib.image.rotate(x, tf.random_uniform([], -0.26, 0.26)), x_image)
         translate_images = tf.map_fn(lambda x: tf.contrib.image.transform(x, [1, 0,
-                                                                              tf.random_uniform([],-2, 2), 0, 1,
-                                                                              tf.random_uniform([],-2, 2), 0, 0 ]), x_image)
+                                                                              tf.random_uniform([], -2, 2), 0, 1,
+                                                                              tf.random_uniform([], -2, 2), 0, 0]),
+                                     x_image)
 
-        augmented_data = tf.concat([x_image,rotate_images, translate_images], axis = 0)
+        augmented_data = tf.concat([x_image, rotate_images, translate_images], axis=0)
         extended_data = sess.run(augmented_data, feed_dict={x_image: images})
         sess.close()
-        return extended_data, np.concatenate((classes,classes,classes))
+        return extended_data, np.concatenate((classes, classes, classes))
 
     def generate_extended_set(self):
         h_flip_invariant_classes = [17, 12, 13, 15, 35]
@@ -71,11 +111,11 @@ class gtsrb:
                 new_trainData.append(flipped)
                 new_trainLabels.append(self.trainLabels[idx])
 
-        #extended_trainData = np.concatenate((self.trainData, np.array(new_trainData)), axis=0)
-        #extended_trainLabels = np.concatenate((self.trainLabels, np.array(new_trainLabels)), axis=0)
-        augmented_images, augmented_labels = self.augment_images(self.trainData, self.trainLabels)
-        print("Exetended dataset from {} to {}".format(self.trainData.shape, augmented_images.shape))
-        print("Exetended labels from {} to {}".format(self.trainLabels.shape, augmented_labels.shape))
+        # extended_trainData = np.concatenate((self.trainData, np.array(new_trainData)), axis=0)
+        # extended_trainLabels = np.concatenate((self.trainLabels, np.array(new_trainLabels)), axis=0)
+        augmented_images, augmented_labels = self.augment_images_2(self.trainData, self.trainLabels)
+        print("Extended dataset from {} to {}".format(self.trainData.shape, augmented_images.shape))
+        print("Extended labels from {} to {}".format(self.trainLabels.shape, augmented_labels.shape))
         np.savez('extended_dataset', augmented_images, augmented_labels)
 
     def get_train_batch(self, allow_smaller_batches=False):
@@ -100,13 +140,13 @@ class gtsrb:
         dataset_size = labels.shape[0]
         indices = range(dataset_size)
         np.random.shuffle(indices)
-        while idx < dataset_size*fraction:
+        while idx < dataset_size * fraction:
             chunk = slice(idx, idx + batch_size)
             chunk = indices[chunk]
             idx = idx + batch_size
             if not limit and idx >= dataset_size:
                 np.random.shuffle(indices)
-                idx=0
+                idx = 0
             yield ([data[i] for i in chunk], [labels[i] for i in chunk])
 
     def _get_batch(self, data_set, allow_smaller_batches=False):
@@ -124,3 +164,8 @@ class gtsrb:
                 plt.figure()
                 plt.imshow(self.trainData[r])
                 plt.show()
+
+
+if __name__ == '__main__':
+    data = gtsrb()
+    data.augment_images_2(data.trainData, data.trainLabels)

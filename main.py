@@ -26,7 +26,8 @@ tf.app.flags.DEFINE_integer('max-epochs', 50,
 tf.app.flags.DEFINE_integer('batch-size', 100, 'Number of examples per mini-batch. (default: %(default)d)')
 tf.app.flags.DEFINE_float('learning-rate', 0.01, 'Number of examples to run. (default: %(default)d)')
 tf.app.flags.DEFINE_float('dropout-keep-rate', 0.7, 'Fraction of connections to keep. (default: %(default)d')
-tf.app.flags.DEFINE_integer('early-stop-epochs', 10, 'Number of steps without improvement before stopping. (default: %(default)d')
+tf.app.flags.DEFINE_integer('early-stop-epochs', 10,
+                            'Number of steps without improvement before stopping. (default: %(default)d')
 
 # Graph Options
 tf.app.flags.DEFINE_bool('data-augment', True, 'Add randomized rotation and flipping to training data')
@@ -132,7 +133,8 @@ def deepnn(x_image, output=43):
     pool3_flat = tf.contrib.layers.flatten(pool3)
     conv4_flat = tf.contrib.layers.flatten(conv4_bn)
 
-    full_pool = tf.nn.dropout(tf.concat([pool1_flat, pool2_flat, pool3_flat, conv4_flat], axis=1), FLAGS.dropout_keep_rate)
+    full_pool = tf.nn.dropout(tf.concat([pool1_flat, pool2_flat, pool3_flat, conv4_flat], axis=1),
+                              FLAGS.dropout_keep_rate)
     logits = tf.layers.dense(inputs=full_pool,
                              units=output,
                              kernel_regularizer=weight_decay,
@@ -144,7 +146,8 @@ def deepnn(x_image, output=43):
 
 def main(_):
     tf.reset_default_graph()
-    gtsrb = GT.gtsrb(batch_size=FLAGS.batch_size, use_extended=FLAGS.use_augmented_data, generate_extended=FLAGS.generate_augmented_data)
+    gtsrb = GT.gtsrb(batch_size=FLAGS.batch_size, use_extended=FLAGS.use_augmented_data,
+                     generate_extended=FLAGS.generate_augmented_data)
     augment = tf.placeholder(tf.bool)
     # Build the graph for the deep net
     with tf.name_scope('inputs'):
@@ -164,7 +167,7 @@ def main(_):
 
     global_step = tf.Variable(0, trainable=False)  # this will be incremented automatically by tensorflow
     decay_steps = 10  # decay the learning rate every 1000 steps
-    decay_rate = 0.9     # the base of our exponential for the decay
+    decay_rate = 0.9  # the base of our exponential for the decay
     decayed_learning_rate = tf.train.exponential_decay(FLAGS.learning_rate, global_epoch,
                                                        decay_steps, decay_rate, staircase=True)
 
@@ -201,19 +204,21 @@ def main(_):
 
         best_accuracy = 0
         steps_since_last_improvement = 0
-        #Batch generator used for validation
+        # Batch generator used for validation
 
         # Training and validation
         for step in range(FLAGS.max_epochs):
-            #Batch generator used for training in each epoch
+            # Batch generator used for training in each epoch
             train_batch_generator = gtsrb.batch_generator('train', batch_size=FLAGS.batch_size, limit=True)
             # rotated_training_images = sess.run([rotation], feed_dict={x_image: trainImages})
             for (trainImages, trainLabels) in train_batch_generator:
                 _, train_summary_str = sess.run([train_step, train_summary],
-                                                feed_dict={x_image: trainImages, y_: trainLabels, augment: True, global_epoch: step},
+                                                feed_dict={x_image: trainImages, y_: trainLabels, augment: True,
+                                                           global_epoch: step},
                                                 options=options, run_metadata=run_metadata)
 
-            validation_batch_generator = gtsrb.batch_generator('test', batch_size=FLAGS.batch_size, limit=True, fraction=1.0)
+            validation_batch_generator = gtsrb.batch_generator('test', batch_size=FLAGS.batch_size, limit=True,
+                                                               fraction=1.0)
             # Validation: Monitoring accuracy using validation set
             total_validation_accuracy = 0
             validation_batches = 0
@@ -233,7 +238,6 @@ def main(_):
                 steps_since_last_improvement += 1
             train_writer.add_summary(train_summary_str, step)
             validation_writer.add_summary(validation_summary_str, step)
-
 
             # Save the model checkpoint periodically.
             if (step + 1) % FLAGS.save_model_frequency == 0 or (step + 1) == FLAGS.max_epochs:
@@ -272,6 +276,7 @@ def main(_):
             chrome_trace = fetched_timeline.generate_chrome_trace_format()
             with open('timeline_01.json', 'w') as f:
                 f.write(chrome_trace)
+
 
 if __name__ == '__main__':
     tf.app.run()
