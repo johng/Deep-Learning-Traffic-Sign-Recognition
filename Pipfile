@@ -1,0 +1,18 @@
+[[source]]
+
+url = "https://pypi.python.org/simple"
+verify_ssl = true
+name = "pypi"
+
+
+[dev-packages]
+
+
+
+[packages]
+
+six = "*"
+numpy = "*"
+scikit-image = "*"
+opencv-python = "*"
+imgaug = {git = "https://github.com/aleju/imgaug"}
