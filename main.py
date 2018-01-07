@@ -151,7 +151,6 @@ def main(_):
         x = tf.placeholder(tf.float32, [None, gtsrb.WIDTH * gtsrb.HEIGHT * gtsrb.CHANNELS])
         x_image = tf.reshape(x, [-1, gtsrb.WIDTH, gtsrb.HEIGHT, gtsrb.CHANNELS])
         x_image = tf.map_fn(lambda img: tf.image.per_image_standardization(img), x_image)
-        x_image = tf.map_fn(lambda img: tf.image.rgb_to_hsv(img), x_image)
         global_epoch = tf.placeholder(tf.int32)
 
     with tf.name_scope('model'):
@@ -162,10 +161,10 @@ def main(_):
     accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32), name='accuracy')
 
     global_step = tf.Variable(0, trainable=False)  # this will be incremented automatically by tensorflow
-    decay_steps = 10  # decay the learning rate every 1000 steps
-    decay_rate = 0.9     # the base of our exponential for the decay
+    decay_steps = 5  # decay the learning rate every 1000 steps
+    decay_rate = 0.95     # the base of our exponential for the decay
     decayed_learning_rate = tf.train.exponential_decay(FLAGS.learning_rate, global_epoch,
-                                                       decay_steps, decay_rate, staircase=True)
+                                                       decay_steps, decay_rate, staircase=False)
 
     # We need to update the dependencies of the minimization op so that it all ops in the `UPDATE_OPS`
     # are added as a dependency, this ensures that we update the mean and variance of the batch normalisation
