@@ -12,20 +12,18 @@ class gtsrb:
     CHANNELS = 3
     OUTPUT = 43
     nTestSamples = 200
-    augmentation_sequence = iaa.SomeOf(2, [
+    augmentation_sequence = iaa.SomeOf(1, [
         iaa.CropAndPad(
             px=((0, 10), (0, 10), (0, 10), (0, 10)),
             pad_mode=ia.ALL,
             pad_cval=(0, 128)
         ),
-        # iaa.Sequential([
-        #     iaa.ChangeColorspace(from_colorspace='RGB', to_colorspace='YCrCb'),
-        #     iaa.WithChannels(0, iaa.Add((-30, 30))),
-        #     iaa.ChangeColorspace(from_colorspace='YCrCb', to_colorspace='RGB')
-        # ]),
+        iaa.Dropout((0.0, 0.05)),
+        #iaa.WithColorspace(from_colorspace='RGB', to_colorspace='HSV', children=iaa.WithChannels(2, iaa.Add((0,10)))),
         iaa.AdditiveGaussianNoise(scale=(0, 0.05 * 255)),
         iaa.AverageBlur(k=((4, 8), (1, 3))),
-        iaa.PerspectiveTransform(scale=(0.01, 0.2))
+        iaa.PerspectiveTransform(scale=(0.01, 0.2)),
+        iaa.Affine(rotate=(-30,30), scale=(0.75,1.25))
     ], random_order=True)
 
     def __init__(self, batch_size=128, use_extended=False, generate_extended=False):
