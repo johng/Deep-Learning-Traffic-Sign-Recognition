@@ -38,7 +38,7 @@ class gtsrb:
             self.generate_extended_set()
         if use_extended:
             extended = np.load('extended_dataset.npz')
-            self.trainData = extended['arr_0']
+            self.trainData = self.whiten_images(extended['arr_0'])
             self.trainLabels = extended['arr_1']
             # assert np.all(t_a, t_b)
             print("Extended dataset {}".format(self.trainData.shape))
@@ -47,6 +47,8 @@ class gtsrb:
             self.trainData = dataset['X_{0:s}'.format('train')]
             self.trainLabels = dataset['y_{0:s}'.format('train')]
         self.testData = dataset['X_{0:s}'.format('test')]
+        for i in range(0, 3):
+            self.testData[:][:][:][i] = (self.testData[:][:][:][i] - self.means[i]) / self.stddevs[i]
         self.testLabels = dataset['y_{0:s}'.format('test')]
 
         self.nTrainSamples = len(self.trainLabels)
@@ -61,20 +63,24 @@ class gtsrb:
         self.currentIndexTrain = 0
 
     def augment_images(self, images, classes):
-        augmented_images = self.augmentation_sequence.augment_images(images * 255.0)
-        return np.concatenate((images, augmented_images / 255.0)), np.concatenate((classes, classes))
+        original_images = images
+        original_classes = classes
+        for i in range(0, 1):
+            augmented_images = self.augmentation_sequence.augment_images(original_images * 255.0)
+            images = np.concatenate((images, augmented_images / 255.0))
+            classes = np.concatenate((classes, original_classes))
+        return images, classes
 
     def whiten_images(self, images):
-        #sess = tf.Session()
-        #x_image = tf.placeholder(tf.float32, [None, gtsrb.WIDTH, gtsrb.HEIGHT, gtsrb.CHANNELS])
-        images = np.mean(images, axis=0)
-        cov = np.dot(images.T, images) / images.shape[0]
-        U,S,V = np.linalg.svd(cov)
-        images_rot = np.dot(images, U)
-        whitened = images_rot / np.sqrt(S + 1e-5)
-        #whitened_images = sess.run(augmented_data, feed_dict={x_image: images})
-        #sess.close()
-        return whitened
+        self.means = []
+        self.stddevs = []
+        for i in range(0, 3):
+            mean_channel = np.mean(images[:][:][:][i])
+            self.means.append(mean_channel)
+            stddev_channel = np.std(images[:][:][:][i])
+            self.stddevs.append(stddev_channel)
+            images[:][:][:][i] = (images[:][:][:][i] - mean_channel) / stddev_channel
+        return images
 
     def view_augmented_image(self, images, idx):
         # set SCIPY_PIL_IMAGE_VIEWER env variable to an image viewer executable
@@ -123,7 +129,6 @@ class gtsrb:
         idx = 0
         data = self.trainData if group == 'train' else self.testData
         labels = self.trainLabels if group == 'train' else self.testLabels
-
         dataset_size = labels.shape[0]
         indices = range(dataset_size)
         np.random.shuffle(indices)

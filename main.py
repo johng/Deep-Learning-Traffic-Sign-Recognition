@@ -35,7 +35,7 @@ tf.app.flags.DEFINE_bool('use-profile', False, 'Record trace timeline data')
 
 # Execution environment options
 tf.app.flags.DEFINE_float('gpu-memory-fraction', 0.8, 'Fraction of the GPU\'s memory to use')
-tf.app.flags.DEFINE_bool('generate-augmented-data', False, 'Whether to generate augmented data on this run')
+tf.app.flags.DEFINE_bool('generate-augmented-data', True, 'Whether to generate augmented data on this run')
 tf.app.flags.DEFINE_bool('use-augmented-data', True, 'Whether to use pre-existing augmented data on this run')
 
 run_log_dir = os.path.join(FLAGS.log_dir, 'exp_bs_{bs}_lr_{lr}'.format(bs=FLAGS.batch_size, lr=FLAGS.learning_rate))
@@ -72,6 +72,7 @@ def deepnn(x_image, output=43):
         padding='valid',
         name='pool1'
     )
+
 
     conv2 = tf.layers.conv2d(
         inputs=pool1,
@@ -127,10 +128,31 @@ def deepnn(x_image, output=43):
     )
     conv4_bn = tf.nn.relu(tf.layers.batch_normalization(conv4))
 
+    pool1_multiscale = tf.layers.max_pooling2d(
+        inputs=conv1_bn_pad,
+        pool_size=[3, 3],
+        strides=8,
+        padding='valid',
+        name='pool1_multiscale'
+    )
+    pool2_multiscale = tf.layers.max_pooling2d(
+        inputs=conv2_bn_pad,
+        pool_size=[3, 3],
+        strides=4,
+        padding='valid',
+        name='pool2_multiscale'
+    )
+    pool3_multiscale = tf.layers.max_pooling2d(
+        inputs=conv3bn_pad,
+        pool_size=[3, 3],
+        strides=2,
+        padding='valid',
+        name='pool3_multiscale'
+    )
     # Multi-Scale features - fast forward earlier layer results
-    pool1_flat = tf.contrib.layers.flatten(pool1)
-    pool2_flat = tf.contrib.layers.flatten(pool2)
-    pool3_flat = tf.contrib.layers.flatten(pool3)
+    pool1_flat = tf.contrib.layers.flatten(pool1_multiscale)
+    pool2_flat = tf.contrib.layers.flatten(pool2_multiscale)
+    pool3_flat = tf.contrib.layers.flatten(pool3_multiscale)
     conv4_flat = tf.contrib.layers.flatten(conv4_bn)
 
     full_pool = tf.nn.dropout(tf.concat([pool1_flat, pool2_flat, pool3_flat, conv4_flat], axis=1),
@@ -149,12 +171,14 @@ def main(_):
     gtsrb = GT.gtsrb(batch_size=FLAGS.batch_size, use_extended=FLAGS.use_augmented_data,
                      generate_extended=FLAGS.generate_augmented_data)
     augment = tf.placeholder(tf.bool)
+
+
     # Build the graph for the deep net
     with tf.name_scope('inputs'):
         y_ = tf.placeholder(tf.float32, [None, gtsrb.OUTPUT])
         x = tf.placeholder(tf.float32, [None, gtsrb.WIDTH * gtsrb.HEIGHT * gtsrb.CHANNELS])
         x_image = tf.reshape(x, [-1, gtsrb.WIDTH, gtsrb.HEIGHT, gtsrb.CHANNELS])
-        x_image = tf.map_fn(lambda img: tf.image.per_image_standardization(img), x_image)
+        normalize = tf.map_fn(lambda img: tf.image.per_image_standardization(img), x_image)
         global_epoch = tf.placeholder(tf.int32)
 
     with tf.name_scope('model'):
@@ -165,8 +189,8 @@ def main(_):
     accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32), name='accuracy')
 
     global_step = tf.Variable(0, trainable=False)  # this will be incremented automatically by tensorflow
-    decay_steps = 10  # decay the learning rate every 1000 steps
-    decay_rate = 0.95  # the base of our exponential for the decay
+    decay_steps = 20  # decay the learning rate every 1000 steps
+    decay_rate = 0.9  # the base of our exponential for the decay
     decayed_learning_rate = tf.train.exponential_decay(FLAGS.learning_rate, global_epoch,
                                                        decay_steps, decay_rate, staircase=False)
 
