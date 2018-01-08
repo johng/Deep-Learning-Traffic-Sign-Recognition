@@ -19,8 +19,8 @@ class GTSRB:
 
         if use_augmented_data:
             augmented_dataset = np.load('extended_dataset.npz')
-            self.train_data.append(augmented_dataset['images'])
-            self.train_labels.append(augmented_dataset['labels'])
+            self.train_data = np.append(self.train_data, augmented_dataset['images'], axis=0)
+            self.train_labels = np.append(self.train_labels, augmented_dataset['labels'], axis=0)
             print('All data:   {}'.format(self.train_data.shape))
             print('All labels: {}'.format(self.train_labels.shape))
 
