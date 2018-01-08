@@ -28,6 +28,8 @@ class gtsrb:
 
     def __init__(self, batch_size=128, use_extended=False, generate_extended=False):
 
+        # TODO @rossng : Move data augmentation to separate file
+
         dataset = np.load('gtsrb_dataset.npz')
         if generate_extended:
             self.trainData = dataset['X_{0:s}'.format('train')]
