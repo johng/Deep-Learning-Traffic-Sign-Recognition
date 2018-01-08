@@ -20,7 +20,7 @@ class gtsrb:
         ),
         iaa.Dropout((0.0, 0.05)),
         #iaa.WithColorspace(from_colorspace='RGB', to_colorspace='HSV', children=iaa.WithChannels(2, iaa.Add((0,10)))),
-        iaa.Add((-20, 50)),
+        iaa.Add((-50, 50)),
         iaa.AdditiveGaussianNoise(scale=(0, 0.05 * 255)),
         iaa.AverageBlur(k=((4, 8), (1, 3))),
         iaa.PerspectiveTransform(scale=(0.01, 0.2)),
