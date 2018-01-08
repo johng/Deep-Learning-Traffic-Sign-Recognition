@@ -61,6 +61,18 @@ class gtsrb:
         augmented_images = self.augmentation_sequence.augment_images(images * 255.0)
         return np.concatenate((images, augmented_images / 255.0)), np.concatenate((classes, classes))
 
+    def whiten_images(self, images):
+        #sess = tf.Session()
+        #x_image = tf.placeholder(tf.float32, [None, gtsrb.WIDTH, gtsrb.HEIGHT, gtsrb.CHANNELS])
+        images = np.mean(images, axis=0)
+        cov = np.dot(images.T, images) / images.shape[0]
+        U,S,V = np.linalg.svd(cov)
+        images_rot = np.dot(images, U)
+        whitened = images_rot / np.sqrt(S + 1e-5)
+        #whitened_images = sess.run(augmented_data, feed_dict={x_image: images})
+        #sess.close()
+        return whitened
+
     def view_augmented_image(self, images, idx):
         # set SCIPY_PIL_IMAGE_VIEWER env variable to an image viewer executable
         self.augmentation_sequence.show_grid((images*255)[idx], rows=8, cols=8)
@@ -85,6 +97,7 @@ class gtsrb:
         # extended_trainData = np.concatenate((self.trainData, np.array(new_trainData)), axis=0)
         # extended_trainLabels = np.concatenate((self.trainLabels, np.array(new_trainLabels)), axis=0)
         augmented_images, augmented_labels = self.augment_images(self.trainData, self.trainLabels)
+        #augmented_images = self.whiten_images(augmented_images)
         print("Extended dataset from {} to {}".format(self.trainData.shape, augmented_images.shape))
         print("Extended labels from {} to {}".format(self.trainLabels.shape, augmented_labels.shape))
         np.savez('extended_dataset', augmented_images, augmented_labels)
