@@ -12,6 +12,14 @@ pipenv --site-packages  # initialises virtualenv with access to system installat
 pipenv install  # installs packages listed in Pipfile.lock 
 ```
 
+## Running
+
+```
+pipenv shell
+python augment_data.py generate  # generate augmented data
+python main.py --use-augmented-data
+```
+
 ## Architecture
 
 ### Layers
