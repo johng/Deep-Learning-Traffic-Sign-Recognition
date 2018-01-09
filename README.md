@@ -20,6 +20,14 @@ python augment_data.py generate  # generate augmented data
 python main.py --use-augmented-data
 ```
 
+You can view examples of augmentations by running
+
+```
+python augment_data.py show 1000
+```
+
+where 1000 is the index of the image you want to view variants of. Environment variable `SCIPY_PIL_IMAGE_VIEWER` must be set to an image viewer.
+
 ## Architecture
 
 ### Layers
