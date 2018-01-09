@@ -1,7 +1,5 @@
 import numpy as np
-from matplotlib import pyplot as plt
-
-
+import tensorflow as tf
 class GTSRB:
     WIDTH = 32
     HEIGHT = 32
@@ -16,6 +14,8 @@ class GTSRB:
         self.train_labels = dataset['y_train']
         print('Original data:   {}'.format(self.train_data.shape))
         print('Original labels: {}'.format(self.train_labels.shape))
+        self.test_data = dataset['X_test']
+        self.test_labels = dataset['y_test']
 
         if use_augmented_data:
             augmented_dataset = np.load('extended_dataset.npz')
@@ -23,9 +23,13 @@ class GTSRB:
             self.train_labels = np.append(self.train_labels, augmented_dataset['labels'], axis=0)
             print('All data:   {}'.format(self.train_data.shape))
             print('All labels: {}'.format(self.train_labels.shape))
+            self.train_data = self.whiten_images(self.normalize_images(self.train_data))
+            self.test_data = self.normalize_images(self.test_data)
+            for i in range(0, 3):
+                self.test_data[:][:][:][i] = (self.test_data[:][:][:][i] - self.means[i]) / self.stddevs[i]
 
-        self.test_data = dataset['X_test']
-        self.test_labels = dataset['y_test']
+
+
 
         self.num_train_items = len(self.train_labels)
         self.num_test_items = len(self.test_labels)
@@ -37,6 +41,14 @@ class GTSRB:
 
         self.current_idx_test = 0
         self.current_idx_train = 0
+
+    def normalize_images(self, images):
+        sess = tf.Session()
+        x_image = tf.placeholder(tf.float32, [None, self.WIDTH, self.HEIGHT, self.CHANNELS])
+        normalize = tf.map_fn(lambda img: tf.image.per_image_standardization(img), x_image)
+        normalized_data = sess.run(normalize, feed_dict={x_image:images})
+        sess.close()
+        return normalized_data
 
     def whiten_images(self, images):
         self.means = []
@@ -64,8 +76,8 @@ class GTSRB:
     def batch_generator(self, group, batch_size=50, limit=False, fraction=1):
 
         idx = 0
-        data = self.trainData if group == 'train' else self.testData
-        labels = self.trainLabels if group == 'train' else self.testLabels
+        data = self.train_data if group == 'train' else self.test_data
+        labels = self.train_labels if group == 'train' else self.test_labels
         dataset_size = labels.shape[0]
         indices = range(dataset_size)
         np.random.shuffle(indices)

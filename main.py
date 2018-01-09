@@ -176,7 +176,7 @@ def main(_):
         y_ = tf.placeholder(tf.float32, [None, gtsrb.OUTPUT])
         x = tf.placeholder(tf.float32, [None, gtsrb.WIDTH * gtsrb.HEIGHT * gtsrb.CHANNELS])
         x_image = tf.reshape(x, [-1, gtsrb.WIDTH, gtsrb.HEIGHT, gtsrb.CHANNELS])
-        normalize = tf.map_fn(lambda img: tf.image.per_image_standardization(img), x_image)
+
         global_epoch = tf.placeholder(tf.int32)
 
     with tf.name_scope('model'):
@@ -187,7 +187,7 @@ def main(_):
     accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32), name='accuracy')
 
     global_step = tf.Variable(0, trainable=False)  # this will be incremented automatically by tensorflow
-    decay_steps = 20  # decay the learning rate every 1000 steps
+    decay_steps = 30  # decay the learning rate every 1000 steps
     decay_rate = 0.9  # the base of our exponential for the decay
     decayed_learning_rate = tf.train.exponential_decay(FLAGS.learning_rate, global_epoch,
                                                        decay_steps, decay_rate, staircase=False)
@@ -212,6 +212,7 @@ def main(_):
     saver = tf.train.Saver(tf.global_variables(), max_to_keep=1)
     best_saver = tf.train.Saver(max_to_keep=1)
 
+
     with tf.Session(config=tf.ConfigProto(gpu_options=gpu_options)) as sess:
         train_writer = tf.summary.FileWriter(run_log_dir + "_train", sess.graph)
         validation_writer = tf.summary.FileWriter(run_log_dir + "_validation", sess.graph)
@@ -226,7 +227,6 @@ def main(_):
         best_accuracy = 0
         steps_since_last_improvement = 0
         # Batch generator used for validation
-
         # Training and validation
         for step in range(FLAGS.max_epochs):
             # Batch generator used for training in each epoch
