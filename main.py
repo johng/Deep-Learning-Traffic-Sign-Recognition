@@ -41,7 +41,9 @@ tf.app.flags.DEFINE_bool('use-augmented-data', True, 'Whether to use pre-generat
 tf.app.flags.DEFINE_bool('normalise-data', True, 'Whether to normalise the training and test data on a per-image basis')
 tf.app.flags.DEFINE_bool('whiten-data', True, 'Whether to \'whiten\' the training and test data on a whole-set basis')
 
-run_log_dir = os.path.join(FLAGS.log_dir, 'exp_bs_{bs}_lr_{lr}'.format(bs=FLAGS.batch_size, lr=FLAGS.learning_rate))
+run_log_dir = os.path.join(FLAGS.log_dir, 'exp_bs_{bs}_lr_{lr}_aug_{aug}_nd_{nd}_wd_{wd}'
+                           .format(bs=FLAGS.batch_size, lr=FLAGS.learning_rate, aug=FLAGS.use_augmented_data,
+                                   nd=FLAGS.normalise_data, wd=FLAGS.whiten_data))
 
 checkpoint_path = os.path.join(run_log_dir, 'model.ckpt')
 best_model_path = os.path.join('{cwd}/logs/best'.format(cwd=os.getcwd()), 'model.ckpt')
@@ -75,7 +77,6 @@ def deepnn(x_image, output=43):
         padding='valid',
         name='pool1'
     )
-
 
     conv2 = tf.layers.conv2d(
         inputs=pool1,
@@ -175,7 +176,6 @@ def main(_):
                      normalise_data=FLAGS.normalise_data, whiten_data=FLAGS.whiten_data)
     augment = tf.placeholder(tf.bool)
 
-
     # Build the graph for the deep net
     with tf.name_scope('inputs'):
         y_ = tf.placeholder(tf.float32, [None, gtsrb.OUTPUT])
@@ -216,7 +216,6 @@ def main(_):
 
     saver = tf.train.Saver(tf.global_variables(), max_to_keep=1)
     best_saver = tf.train.Saver(max_to_keep=1)
-
 
     with tf.Session(config=tf.ConfigProto(gpu_options=gpu_options)) as sess:
         train_writer = tf.summary.FileWriter(run_log_dir + "_train", sess.graph)
