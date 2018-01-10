@@ -1,7 +1,7 @@
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
-
+from math import sqrt
 import sys
 import os
 import GTSRB as GT
@@ -48,11 +48,13 @@ gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=FLAGS.gpu_memory_fra
 
 
 def deepnn(x_image, output=43):
-    padding_pooling = [[0, 0], [0, 1], [0, 1], [0, 0]]
+    conv_padding = [[0, 0], [2,2], [2,2], [0,0]]
+    pool_padding = [ [0,0], [0,1], [0,1], [0,0]]
 
     weight_decay = tf.contrib.layers.l2_regularizer(scale=0.0001)
 
     # First convolutional layer - maps one RGB image to 32 feature maps.
+
     conv1 = tf.layers.conv2d(
         inputs=x_image,
         filters=32,
@@ -62,15 +64,17 @@ def deepnn(x_image, output=43):
         use_bias=False,
         kernel_regularizer=weight_decay,
         name='conv1'
+
     )
-    conv1_bn = tf.nn.crelu(tf.layers.batch_normalization(conv1))
-    conv1_bn_pad = tf.pad(conv1_bn, padding_pooling, "CONSTANT")
+    conv1_bn = tf.nn.relu(tf.layers.batch_normalization(conv1))
+    conv1_bn_pad = tf.pad(conv1_bn, pool_padding, "CONSTANT")
     pool1 = tf.layers.average_pooling2d(
-        inputs=conv1_bn_pad,
+        inputs=conv1_bn,
         pool_size=[3, 3],
         strides=2,
-        padding='valid',
-        name='pool1'
+        padding='same',
+        name='pool1',
+        data_format='channels_first'
     )
 
     conv2 = tf.layers.conv2d(
@@ -79,19 +83,21 @@ def deepnn(x_image, output=43):
         kernel_initializer=tf.truncated_normal_initializer(mean=0, stddev=0.01),
         kernel_size=[5, 5],
         padding='same',
-        activation=tf.nn.crelu,
+        activation=tf.nn.relu,
         use_bias=False,
         kernel_regularizer=weight_decay,
-        name='conv2'
+        name='conv2',
+        data_format='channels_first'
     )
-    conv2_bn = tf.nn.crelu(tf.layers.batch_normalization(conv2))
-    conv2_bn_pad = tf.pad(conv2_bn, padding_pooling, "CONSTANT")
+    conv2_bn = tf.nn.relu(tf.layers.batch_normalization(conv2))
+    conv2_bn_pad = tf.pad(conv2_bn, pool_padding, "CONSTANT")
     pool2 = tf.layers.max_pooling2d(
-        inputs=conv2_bn_pad,
+        inputs=conv2_bn,
         pool_size=[3, 3],
         strides=2,
-        padding='valid',
-        name='pool2'
+        padding='same',
+        name='pool2',
+        data_format='channels_first'
     )
 
     conv3 = tf.layers.conv2d(
@@ -100,19 +106,21 @@ def deepnn(x_image, output=43):
         filters=64,
         kernel_size=[5, 5],
         padding='same',
-        activation=tf.nn.crelu,
+        activation=tf.nn.relu,
         use_bias=False,
         kernel_regularizer=weight_decay,
-        name='conv3'
+        name='conv3',
+        data_format='channels_first'
     )
-    conv3_bn = tf.nn.crelu(tf.layers.batch_normalization(conv3))
-    conv3bn_pad = tf.pad(conv3_bn, padding_pooling, "CONSTANT")
+    conv3_bn = tf.nn.relu(tf.layers.batch_normalization(conv3))
+    conv3bn_pad = tf.pad(conv3_bn, pool_padding, "CONSTANT")
     pool3 = tf.layers.max_pooling2d(
-        inputs=conv3bn_pad,
+        inputs=conv3_bn,
         pool_size=[3, 3],
         strides=2,
-        padding='valid',
-        name='pool3'
+        padding='same',
+        name='pool3',
+        data_format='channels_first'
     )
 
     conv4 = tf.layers.conv2d(
@@ -125,6 +133,8 @@ def deepnn(x_image, output=43):
         use_bias=False,
         name='conv4'
     )
+
+
     conv4_bn = tf.nn.relu(tf.layers.batch_normalization(conv4))
 
     # Multi-Scale features - fast forward earlier layer results
@@ -135,7 +145,7 @@ def deepnn(x_image, output=43):
 
     full_pool = tf.nn.dropout(tf.concat([pool1_flat, pool2_flat, pool3_flat, conv4_flat], axis=1),
                               FLAGS.dropout_keep_rate)
-    logits = tf.layers.dense(inputs=full_pool,
+    logits = tf.layers.dense(inputs=conv4_flat,
                              units=output,
                              kernel_regularizer=weight_decay,
                              kernel_initializer=tf.truncated_normal_initializer(mean=0, stddev=0.01),
@@ -144,6 +154,54 @@ def deepnn(x_image, output=43):
     return logits
 
 
+def put_kernels_on_grid (kernel, grid_Y, grid_X, pad = 1):
+
+    '''Visualize conv. features as an image (mostly for the 1st layer).
+    Place kernel into a grid, with some paddings between adjacent filters.
+
+    Args:
+      kernel:            tensor of shape [Y, X, NumChannels, NumKernels]
+      (grid_Y, grid_X):  shape of the grid. Require: NumKernels == grid_Y * grid_X
+                           User is responsible of how to break into two multiples.
+      pad:               number of black pixels around each filter (between them)
+
+    Return:
+      Tensor of shape [(Y+2*pad)*grid_Y, (X+2*pad)*grid_X, NumChannels, 1].
+    '''
+
+    x_min = tf.reduce_min(kernel)
+    x_max = tf.reduce_max(kernel)
+
+    kernel1 = (kernel - x_min) / (x_max - x_min)
+
+    # pad X and Y
+    x1 = tf.pad(kernel1, tf.constant( [[pad,pad],[pad, pad],[0,0],[0,0]] ), mode = 'CONSTANT')
+
+    # X and Y dimensions, w.r.t. padding
+    Y = kernel1.get_shape()[0] + 2 * pad
+    X = kernel1.get_shape()[1] + 2 * pad
+
+    channels = kernel1.get_shape()[2]
+
+    # put NumKernels to the 1st dimension
+    x2 = tf.transpose(x1, (3, 0, 1, 2))
+    # organize grid on Y axis
+    x3 = tf.reshape(x2, tf.stack([grid_X, Y * grid_Y, X, channels])) #3
+
+    # switch X and Y axes
+    x4 = tf.transpose(x3, (0, 2, 1, 3))
+    # organize grid on X axis
+    x5 = tf.reshape(x4, tf.stack([1, X * grid_X, Y * grid_Y, channels])) #3
+
+    # back to normal order (not combining with the next step for clarity)
+    x6 = tf.transpose(x5, (2, 1, 3, 0))
+
+    # to tf.image_summary order [batch_size, height, width, channels],
+    #   where in this case batch_size == 1
+    x7 = tf.transpose(x6, (3, 0, 1, 2))
+
+    # scale to [0, 255] and convert to uint8
+    return tf.image.convert_image_dtype(x7, dtype = tf.uint8)
 def main(_):
     tf.reset_default_graph()
     gtsrb = GT.gtsrb(batch_size=FLAGS.batch_size, use_extended=FLAGS.use_augmented_data,
@@ -159,6 +217,24 @@ def main(_):
 
     with tf.name_scope('model'):
         y_conv = deepnn(x_image)
+
+    with tf.variable_scope('conv1', reuse=True):
+        kernel1 = tf.get_variable('kernel')
+        grid1 = put_kernels_on_grid(kernel1, 8,4)
+        conv1_features = tf.summary.image('conv1/kernels', grid1, max_outputs=1)
+
+    with tf.variable_scope('conv2', reuse=True):
+        vars = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope='conv2')
+        print(vars)
+        kernel2 = tf.get_variable('kernel')
+        reduced= tf.reduce_mean(kernel2,axis=2,keep_dims=True)
+        grid2 = put_kernels_on_grid(reduced, 8 , 4)
+        # [1,56,28,64]
+        conv2_features = tf.summary.image('conv2/kernels', grid2, max_outputs=1)
+
+
+    conv_features = tf.summary.merge([ conv1_features, conv2_features])
+
 
     cross_entropy = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=y_, logits=y_conv))
     correct_prediction = tf.equal(tf.argmax(y_conv, 1), tf.argmax(y_, 1))
@@ -184,7 +260,7 @@ def main(_):
     learning_rate_summary = tf.summary.scalar("Learning Rate", decayed_learning_rate)
     img_summary = tf.summary.image('input images', x_image)
 
-    train_summary = tf.summary.merge([loss_summary, accuracy_summary, learning_rate_summary, img_summary])
+    train_summary = tf.summary.merge([loss_summary, accuracy_summary, learning_rate_summary, img_summary, conv_features])
     validation_summary = tf.summary.merge([loss_summary, accuracy_summary])
 
     saver = tf.train.Saver(tf.global_variables(), max_to_keep=1)
@@ -207,6 +283,7 @@ def main(_):
 
         # Training and validation
         for step in range(FLAGS.max_epochs):
+
             # Batch generator used for training in each epoch
             train_batch_generator = gtsrb.batch_generator('train', batch_size=FLAGS.batch_size, limit=True)
             # rotated_training_images = sess.run([rotation], feed_dict={x_image: trainImages})
@@ -275,6 +352,7 @@ def main(_):
             chrome_trace = fetched_timeline.generate_chrome_trace_format()
             with open('timeline_01.json', 'w') as f:
                 f.write(chrome_trace)
+
 
 
 if __name__ == '__main__':

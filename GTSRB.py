@@ -67,14 +67,17 @@ class gtsrb:
     def whiten_images(self, images):
         #sess = tf.Session()
         #x_image = tf.placeholder(tf.float32, [None, gtsrb.WIDTH, gtsrb.HEIGHT, gtsrb.CHANNELS])
-        images = np.mean(images, axis=0)
-        cov = np.dot(images.T, images) / images.shape[0]
-        U,S,V = np.linalg.svd(cov)
-        images_rot = np.dot(images, U)
-        whitened = images_rot / np.sqrt(S + 1e-5)
+        #images_mean = np.mean(images, axis=0)
+        #images_std = np.std(images,axis=0)
+
+        #cov = np.dot(images.T, images) / images.shape[0]
+        #U,S,V = np.linalg.svd(cov)
+        #images_rot = np.dot(images, U)
+        #whitened = images_rot / np.sqrt(S + 1e-5)
         #whitened_images = sess.run(augmented_data, feed_dict={x_image: images})
         #sess.close()
-        return whitened
+
+        return images
 
     def view_augmented_image(self, images, idx):
         # set SCIPY_PIL_IMAGE_VIEWER env variable to an image viewer executable
