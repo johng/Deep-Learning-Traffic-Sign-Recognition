@@ -35,7 +35,11 @@ tf.app.flags.DEFINE_bool('use-profile', False, 'Record trace timeline data')
 
 # Execution environment options
 tf.app.flags.DEFINE_float('gpu-memory-fraction', 0.8, 'Fraction of the GPU\'s memory to use')
+
+# Implementation options
 tf.app.flags.DEFINE_bool('use-augmented-data', True, 'Whether to use pre-generated augmented data on this run')
+tf.app.flags.DEFINE_bool('normalise-data', True, 'Whether to normalise the training and test data on a per-image basis')
+tf.app.flags.DEFINE_bool('whiten-data', True, 'Whether to \'whiten\' the training and test data on a whole-set basis')
 
 run_log_dir = os.path.join(FLAGS.log_dir, 'exp_bs_{bs}_lr_{lr}'.format(bs=FLAGS.batch_size, lr=FLAGS.learning_rate))
 
@@ -167,7 +171,8 @@ def deepnn(x_image, output=43):
 
 def main(_):
     tf.reset_default_graph()
-    gtsrb = GT.GTSRB(batch_size=FLAGS.batch_size, use_augmented_data=FLAGS.use_augmented_data)
+    gtsrb = GT.GTSRB(batch_size=FLAGS.batch_size, use_augmented_data=FLAGS.use_augmented_data,
+                     normalise_data=FLAGS.normalise_data, whiten_data=FLAGS.whiten_data)
     augment = tf.placeholder(tf.bool)
 
 
