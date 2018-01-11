@@ -31,7 +31,7 @@ def deepnn_v2(x_image, output=43):
     if FLAGS.norm_layer:
         conv1_bn = tf.layers.batch_normalization(conv1)
     # conv1_bn_pad = tf.pad(conv1_bn, padding_pooling, "CONSTANT")
-    pool1 = tf.layers.max_pooling2d(
+    pool1 = tf.layers.average_pooling2d(
         inputs=conv1_bn,
         pool_size=[3, 3],
         strides=2,

@@ -242,7 +242,7 @@ def main(_):
                                                 num_segments=43)
 
     global_step = tf.Variable(0, trainable=False)  # this will be incremented automatically by tensorflow
-    decay_steps = 30  # decay the learning rate every 1000 steps
+    decay_steps = 50  # decay the learning rate every 1000 steps
     decay_rate = 0.9  # the base of our exponential for the decay
     decayed_learning_rate = tf.train.exponential_decay(FLAGS.learning_rate, global_epoch,
                                                        decay_steps, decay_rate, staircase=False)

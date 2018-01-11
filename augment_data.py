@@ -10,13 +10,13 @@ except ImportError:
 
 ia.seed(1)
 
-augmentations = iaa.SomeOf(3, [
+augmentations = iaa.SomeOf(1, [
     iaa.CropAndPad(
         px=((0, 10), (0, 10), (0, 10), (0, 10)),
         pad_mode=ia.ALL,
         pad_cval=(0, 128)
     ),
-    iaa.CoarseDropout(p=(0.05, 0.2), size_percent=(0.15, 0.20)),
+    #iaa.CoarseDropout(p=(0.05, 0.2), size_percent=(0.15, 0.20)),
     # iaa.WithColorspace(from_colorspace='RGB', to_colorspace='HSV', children=iaa.WithChannels(2, iaa.Add((0,10)))),
     iaa.Add((-50, 50)),
     #iaa.AdditiveGaussianNoise(scale=(0, 0.05 * 255)),
@@ -25,6 +25,7 @@ augmentations = iaa.SomeOf(3, [
     iaa.Affine(rotate=(-30, 30), scale=(0.75, 1.25))
 ], random_order=True)
 
+flipseq = iaa.Fliplr(1.0)
 
 def view_augmented_image(images, idx):
     # set SCIPY_PIL_IMAGE_VIEWER env variable to an image viewer executable
@@ -40,7 +41,7 @@ def flip_invariant_images(images, labels):
     for idx, img in enumerate(images):
         label = np.argmax(labels[idx])
         if label in h_flip_invariant_classes:
-            flipped_images.append(np.fliplr(img))
+            flipped_images.append(flipseq.augment_image(img * 255.0) / 255.0)
             flipped_labels.append(labels[idx])
 
     return np.stack(flipped_images, axis=0), np.stack(flipped_labels, axis=0)
