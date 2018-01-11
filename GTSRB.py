@@ -1,13 +1,18 @@
 import numpy as np
 import tensorflow as tf
 
-
 class GTSRB:
     WIDTH = 32
     HEIGHT = 32
     CHANNELS = 3
     OUTPUT = 43
     num_test_items = -1
+    speed_limit_classes = [0, 1, 2, 3, 4, 5, 6, 7, 8]
+    prohibitory_classes = [9, 10, 15, 16]
+    derestriction_classes = [6, 32, 41, 42]
+    mandatory_classes = [33, 34, 35, 36, 37, 38, 39, 40]
+    danger_classes = [11, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31]
+    unique_classes = [12, 13, 14, 17]
 
     def __init__(self, batch_size=128, use_augmented_data=False, normalise_data=True, whiten_data=True):
         dataset = np.load('gtsrb_dataset.npz')
@@ -82,7 +87,7 @@ class GTSRB:
         data = self.train_data if group == 'train' else self.test_data
         labels = self.train_labels if group == 'train' else self.test_labels
         dataset_size = labels.shape[0]
-        indices = range(dataset_size)
+        indices = np.arange(dataset_size)
         np.random.shuffle(indices)
         while idx < dataset_size * fraction:
             chunk = slice(idx, idx + batch_size)

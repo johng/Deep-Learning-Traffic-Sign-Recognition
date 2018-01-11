@@ -6,6 +6,7 @@ import sys
 import os
 import GTSRB as GT
 import tensorflow as tf
+import numpy as np
 from tensorflow.python.client import timeline
 
 here = os.path.dirname(__file__)
@@ -208,6 +209,11 @@ def main(_):
     correct_prediction = tf.equal(tf.argmax(y_conv, 1), tf.argmax(y_, 1))
     accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32), name='accuracy')
 
+    correct_per_class_onehot = tf.multiply(y_, y_conv)
+    class_counts = tf.count_nonzero(y_, 0)
+    correct_per_class_count = tf.count_nonzero(correct_per_class_onehot, 0)
+    accuracy_per_class = tf.divide(correct_per_class_count, class_counts)
+
     global_step = tf.Variable(0, trainable=False)  # this will be incremented automatically by tensorflow
     decay_steps = 30  # decay the learning rate every 1000 steps
     decay_rate = 0.9  # the base of our exponential for the decay
@@ -296,19 +302,30 @@ def main(_):
         evaluated_images = 0
         test_accuracy = 0
         batch_count = 0
+        test_accuracy_per_class = np.zeros(43)
 
         gtsrb.reset()
         best_saver.restore(sess, best_model_path)
         test_batch_generator = gtsrb.batch_generator('test', batch_size=FLAGS.batch_size, limit=True)
         for (testImages, testLabels) in test_batch_generator:
-            test_accuracy_temp = sess.run(accuracy, feed_dict={x_image: testImages, y_: testLabels, augment: False})
+            test_accuracy_temp, test_accuracy_per_class_temp = sess.run([accuracy, accuracy_per_class],
+                                                                        feed_dict={x_image: testImages, y_: testLabels,
+                                                                                   augment: False})
 
             batch_count += 1
             test_accuracy += test_accuracy_temp
+            test_accuracy_per_class = np.add(test_accuracy_per_class, test_accuracy_per_class_temp)
             evaluated_images += len(testLabels)
 
         test_accuracy = test_accuracy / batch_count
+        test_accuracy_per_class = test_accuracy_per_class / batch_count
         print('test set: accuracy on test set: %.3f' % test_accuracy)
+        print('test set: accuracy on test set per class: {}'.format(test_accuracy_per_class))
+        print('test set: accuracy on speed limits: {:.3f}'.format(test_accuracy_per_class[GT.GTSRB.speed_limit_classes].sum()))
+        print('test set: accuracy on prohibitory: {:.3f}'.format(test_accuracy_per_class[GT.GTSRB.prohibitory_classes].sum()))
+        print('test set: accuracy on derestriction: {:.3f}'.format(test_accuracy_per_class[GT.GTSRB.derestriction_classes].sum()))
+        print('test set: accuracy on mandatory: {:.3f}'.format(test_accuracy_per_class[GT.GTSRB.mandatory_classes].sum()))
+        print('test set: accuracy on unique: {:.3f}'.format(test_accuracy_per_class[GT.GTSRB.unique_classes].sum()))
         print('model saved to ' + checkpoint_path)
 
         train_writer.close()
