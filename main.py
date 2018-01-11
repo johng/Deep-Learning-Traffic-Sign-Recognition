@@ -30,18 +30,17 @@ tf.app.flags.DEFINE_float('dropout-keep-rate', 0.7, 'Fraction of connections to 
 tf.app.flags.DEFINE_integer('early-stop-epochs', 10,
                             'Number of steps without improvement before stopping. (default: %(default)d')
 
-tf.app.flags.DEFINE_bool('multi-scale', False,
-                         'Enable multi scale feature. (default: %(default)d')
-
-tf.app.flags.DEFINE_bool('crelu', False, 'Enable CReLU activation. (default: %(default)d')
 
 # Graph Options
 tf.app.flags.DEFINE_bool('use-profile', False, 'Record trace timeline data')
 
 # Execution environment options
 tf.app.flags.DEFINE_float('gpu-memory-fraction', 0.8, 'Fraction of the GPU\'s memory to use')
+tf.app.flags.DEFINE_integer('seed', 10, 'Seed')
 
 # Implementation options
+tf.app.flags.DEFINE_bool('multi-scale', False, 'Enable multi scale feature. (default: %(default)d')
+tf.app.flags.DEFINE_bool('crelu', False, 'Enable CReLU activation. (default: %(default)d')
 tf.app.flags.DEFINE_bool('use-augmented-data', False, 'Whether to use pre-generated augmented data on this run')
 tf.app.flags.DEFINE_bool('normalise-data', True, 'Whether to normalise the training and test data on a per-image basis')
 tf.app.flags.DEFINE_bool('whiten-data', True, 'Whether to \'whiten\' the training and test data on a whole-set basis')
@@ -70,7 +69,7 @@ def deepnn(x_image, output=43):
     conv1 = tf.layers.conv2d(
         inputs=x_image,
         filters=32,
-        kernel_initializer=tf.truncated_normal_initializer(mean=0, stddev=0.01),
+        kernel_initializer=tf.truncated_normal_initializer(mean=0, stddev=0.01, seed=FLAGS.seed),
         kernel_size=[5, 5],
         padding='same',
         use_bias=False,
@@ -91,7 +90,7 @@ def deepnn(x_image, output=43):
     conv2 = tf.layers.conv2d(
         inputs=pool1,
         filters=32,
-        kernel_initializer=tf.truncated_normal_initializer(mean=0, stddev=0.01),
+        kernel_initializer=tf.truncated_normal_initializer(mean=0, stddev=0.01, seed=FLAGS.seed),
         kernel_size=[5, 5],
         padding='same',
         activation=activation,
@@ -111,7 +110,7 @@ def deepnn(x_image, output=43):
 
     conv3 = tf.layers.conv2d(
         inputs=pool2,
-        kernel_initializer=tf.truncated_normal_initializer(mean=0, stddev=0.01),
+        kernel_initializer=tf.truncated_normal_initializer(mean=0, stddev=0.01, seed=FLAGS.seed),
         filters=64,
         kernel_size=[5, 5],
         padding='same',
@@ -172,14 +171,14 @@ def deepnn(x_image, output=43):
 
     if FLAGS.multi_scale:
         full_pool = tf.nn.dropout(tf.concat([pool1_flat, pool2_flat, pool3_flat, conv4_flat], axis=1),
-                                  FLAGS.dropout_keep_rate)
+                                  FLAGS.dropout_keep_rate, seed=FLAGS.seed)
     else:
         full_pool = conv4_flat
 
     logits = tf.layers.dense(inputs=full_pool,
                              units=output,
                              kernel_regularizer=weight_decay,
-                             kernel_initializer=tf.truncated_normal_initializer(mean=0, stddev=0.01),
+                             kernel_initializer=tf.truncated_normal_initializer(mean=0, stddev=0.01, seed=FLAGS.seed),
                              name='fc1',
                              )
     return logits
@@ -187,8 +186,9 @@ def deepnn(x_image, output=43):
 
 def main(_):
     tf.reset_default_graph()
+    tf.set_random_seed(FLAGS.seed)
     gtsrb = GT.GTSRB(batch_size=FLAGS.batch_size, use_augmented_data=FLAGS.use_augmented_data,
-                     normalise_data=FLAGS.normalise_data, whiten_data=FLAGS.whiten_data)
+                     normalise_data=FLAGS.normalise_data, whiten_data=FLAGS.whiten_data, seed=FLAGS.seed)
     augment = tf.placeholder(tf.bool)
 
     # Build the graph for the deep net

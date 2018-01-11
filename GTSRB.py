@@ -14,7 +14,8 @@ class GTSRB:
     danger_classes = [11, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31]
     unique_classes = [12, 13, 14, 17]
 
-    def __init__(self, batch_size=128, use_augmented_data=False, normalise_data=True, whiten_data=True):
+    def __init__(self, batch_size=128, use_augmented_data=False, normalise_data=True, whiten_data=True, seed=10):
+        np.random.seed(seed)
         dataset = np.load('gtsrb_dataset.npz')
 
         self.train_data = dataset['X_train']
