@@ -328,6 +328,8 @@ def main(_):
             test_accuracy_per_class[GT.GTSRB.derestriction_classes].sum() / len(GT.GTSRB.derestriction_classes)))
         print('test set: accuracy on mandatory: {:.4f}'.format(
             test_accuracy_per_class[GT.GTSRB.mandatory_classes].sum() / len(GT.GTSRB.mandatory_classes)))
+        print('test set: accuracy on danger: {:.4f}'.format(
+            test_accuracy_per_class[GT.GTSRB.danger_classes].sum() / len(GT.GTSRB.danger_classes)))
         print('test set: accuracy on unique: {:.4f}'.format(
             test_accuracy_per_class[GT.GTSRB.unique_classes].sum() / len(GT.GTSRB.unique_classes)))
         print('model saved to ' + checkpoint_path)
