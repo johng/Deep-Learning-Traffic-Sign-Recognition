@@ -26,10 +26,9 @@ tf.app.flags.DEFINE_integer('max-epochs', 50,
                             'Number of iterations of batch training. (default: %(default)d)')
 tf.app.flags.DEFINE_integer('batch-size', 100, 'Number of examples per mini-batch. (default: %(default)d)')
 tf.app.flags.DEFINE_float('learning-rate', 0.01, 'Number of examples to run. (default: %(default)d)')
-tf.app.flags.DEFINE_float('dropout-keep-rate', 0.7, 'Fraction of connections to keep. (default: %(default)d')
+
 tf.app.flags.DEFINE_integer('early-stop-epochs', 10,
                             'Number of steps without improvement before stopping. (default: %(default)d')
-
 
 # Graph Options
 tf.app.flags.DEFINE_bool('use-profile', False, 'Record trace timeline data')
@@ -44,10 +43,22 @@ tf.app.flags.DEFINE_bool('crelu', False, 'Enable CReLU activation. (default: %(d
 tf.app.flags.DEFINE_bool('use-augmented-data', False, 'Whether to use pre-generated augmented data on this run')
 tf.app.flags.DEFINE_bool('normalise-data', True, 'Whether to normalise the training and test data on a per-image basis')
 tf.app.flags.DEFINE_bool('whiten-data', True, 'Whether to \'whiten\' the training and test data on a whole-set basis')
+tf.app.flags.DEFINE_bool('adam-optimiser' ,False, 'Use AdamOptimiser, else use MGD. %(default)d')
+tf.app.flags.DEFINE_bool('norm_layer' ,True, 'Use normalisation layer. %(default)d')
+tf.app.flags.DEFINE_bool('lr_decay' ,False, 'Learning rate decay. %(default)d')
+tf.app.flags.DEFINE_float('dropout-keep-rate', 1, 'Fraction of connections to keep. (default: %(default)d')
 
-run_log_dir = os.path.join(FLAGS.log_dir, 'exp_bs_{bs}_lr_{lr}_aug_{aug}_nd_{nd}_wd_{wd}'
+
+run_log_dir = os.path.join(FLAGS.log_dir, 'exp_bs_{bs}_lr_{lr}_aug_{aug}_'
+                                          'normd_{nd}_wd_{wd}_crelu_{crelu}_'
+                                          'ms_{ms}_adam_{adam}_normlayer_{norm}'
+                                          'lr_decay_{lr_d}_dropoutkeep_{do_keep}'
+
                            .format(bs=FLAGS.batch_size, lr=FLAGS.learning_rate, aug=FLAGS.use_augmented_data,
-                                   nd=FLAGS.normalise_data, wd=FLAGS.whiten_data))
+                                   nd=FLAGS.normalise_data, wd=FLAGS.whiten_data, crelu=FLAGS.crelu,
+                                   ms=FLAGS.multi_scale,adam=FLAGS.adam_optimiser, norm=FLAGS.norm_layer,
+                                   lr_d=FLAGS.lr_decay,do_keep=FLAGS.dropout_keep_rate))
+
 
 checkpoint_path = os.path.join(run_log_dir, 'model.ckpt')
 best_model_path = os.path.join('{cwd}/logs/best'.format(cwd=os.getcwd()), 'model.ckpt')
@@ -57,6 +68,7 @@ gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=FLAGS.gpu_memory_fra
 
 
 def deepnn(x_image, output=43):
+
     padding_pooling = [[0, 0], [0, 1], [0, 1], [0, 0]]
 
     activation = tf.nn.relu
@@ -77,7 +89,10 @@ def deepnn(x_image, output=43):
         name='conv1',
         activation=activation,
     )
-    conv1_bn = tf.layers.batch_normalization(conv1)
+
+    conv1_bn = conv1
+    if FLAGS.norm_layer:
+        conv1_bn = tf.layers.batch_normalization(conv1)
     # conv1_bn_pad = tf.pad(conv1_bn, padding_pooling, "CONSTANT")
     pool1 = tf.layers.average_pooling2d(
         inputs=conv1_bn,
@@ -98,7 +113,9 @@ def deepnn(x_image, output=43):
         kernel_regularizer=weight_decay,
         name='conv2'
     )
-    conv2_bn = tf.layers.batch_normalization(conv2)
+    conv2_bn = conv2
+    if FLAGS.norm_layer:
+        conv2_bn = tf.layers.batch_normalization(conv2)
     # conv2_bn_pad = tf.pad(conv2_bn, padding_pooling, "CONSTANT")
     pool2 = tf.layers.max_pooling2d(
         inputs=conv2_bn,
@@ -119,7 +136,11 @@ def deepnn(x_image, output=43):
         kernel_regularizer=weight_decay,
         name='conv3'
     )
-    conv3_bn = tf.layers.batch_normalization(conv3)
+
+    conv3_bn = conv3
+    if FLAGS.norm_layer:
+        conv3_bn = tf.layers.batch_normalization(conv3)
+
     conv3bn_pad = tf.pad(conv3_bn, padding_pooling, "CONSTANT")
     pool3 = tf.layers.max_pooling2d(
         inputs=conv3_bn,
@@ -139,7 +160,10 @@ def deepnn(x_image, output=43):
         use_bias=False,
         name='conv4'
     )
-    conv4_bn = (tf.layers.batch_normalization(conv4))
+
+    conv4_bn = conv4
+    if FLAGS.norm_layer:
+        conv4_bn = tf.layers.batch_normalization(conv4)
 
     pool1_multiscale = tf.layers.max_pooling2d(
         inputs=conv4_bn,
@@ -170,11 +194,11 @@ def deepnn(x_image, output=43):
     conv4_flat = tf.contrib.layers.flatten(conv4_bn)
 
     if FLAGS.multi_scale:
-        full_pool = tf.nn.dropout(tf.concat([pool1_flat, pool2_flat, pool3_flat, conv4_flat], axis=1),
-                                  FLAGS.dropout_keep_rate, seed=FLAGS.seed)
+        full_pool = tf.concat([pool1_flat, pool2_flat, pool3_flat, conv4_flat], axis=1)
     else:
         full_pool = conv4_flat
 
+    full_pool = tf.nn.dropout(full_pool , FLAGS.dropout_keep_rate, seed=FLAGS.seed)
     logits = tf.layers.dense(inputs=full_pool,
                              units=output,
                              kernel_regularizer=weight_decay,
@@ -224,6 +248,8 @@ def main(_):
     with tf.control_dependencies(update_ops):
         train_step = tf.train.MomentumOptimizer(decayed_learning_rate, 0.9).minimize(cross_entropy,
                                                                                      global_step=global_step)
+        if FLAGS.adam_optimiser:
+            train_step = tf.train.AdamOptimizer(decayed_learning_rate).minimize(cross_entropy, global_step=global_step)
 
     loss_summary = tf.summary.scalar("Loss", cross_entropy)
     accuracy_summary = tf.summary.scalar("Accuracy", accuracy)
