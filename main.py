@@ -73,8 +73,7 @@ def deepnn(x_image, output=43):
         pool_size=[3, 3],
         strides=2,
         padding='same',
-        name='pool1',
-        data_format='channels_first'
+        name='pool1'
     )
 
     conv2 = tf.layers.conv2d(
@@ -86,8 +85,7 @@ def deepnn(x_image, output=43):
         activation=tf.nn.relu,
         use_bias=False,
         kernel_regularizer=weight_decay,
-        name='conv2',
-        data_format='channels_first'
+        name='conv2'
     )
     conv2_bn = tf.nn.relu(tf.layers.batch_normalization(conv2))
     conv2_bn_pad = tf.pad(conv2_bn, pool_padding, "CONSTANT")
@@ -109,8 +107,7 @@ def deepnn(x_image, output=43):
         activation=tf.nn.relu,
         use_bias=False,
         kernel_regularizer=weight_decay,
-        name='conv3',
-        data_format='channels_first'
+        name='conv3'
     )
     conv3_bn = tf.nn.relu(tf.layers.batch_normalization(conv3))
     conv3bn_pad = tf.pad(conv3_bn, pool_padding, "CONSTANT")
@@ -119,8 +116,7 @@ def deepnn(x_image, output=43):
         pool_size=[3, 3],
         strides=2,
         padding='same',
-        name='pool3',
-        data_format='channels_first'
+        name='pool3'
     )
 
     conv4 = tf.layers.conv2d(
