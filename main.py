@@ -319,17 +319,17 @@ def main(_):
 
         test_accuracy = test_accuracy / batch_count
         test_accuracy_per_class = test_correct_per_class / test_class_counts
-        print('test set: accuracy on test set: %.3f' % test_accuracy)
-        print('test set: check accuracy: {:.3f}'.format(test_correct_per_class.sum() / test_class_counts.sum()))
-        print('test set: accuracy on speed limits: {:.3f}'.format(
+        print('test set: accuracy on test set: %.4f' % test_accuracy)
+        print('test set: check accuracy: {:.4f}'.format(test_correct_per_class.sum() / test_class_counts.sum()))
+        print('test set: accuracy on speed limits: {:.4f}'.format(
             test_accuracy_per_class[GT.GTSRB.speed_limit_classes].sum() / len(GT.GTSRB.speed_limit_classes)))
-        print('test set: accuracy on prohibitory: {:.3f}'.format(
+        print('test set: accuracy on prohibitory: {:.4f}'.format(
             test_accuracy_per_class[GT.GTSRB.prohibitory_classes].sum() / len(GT.GTSRB.prohibitory_classes)))
-        print('test set: accuracy on derestriction: {:.3f}'.format(
+        print('test set: accuracy on derestriction: {:.4f}'.format(
             test_accuracy_per_class[GT.GTSRB.derestriction_classes].sum() / len(GT.GTSRB.derestriction_classes)))
-        print('test set: accuracy on mandatory: {:.3f}'.format(
+        print('test set: accuracy on mandatory: {:.4f}'.format(
             test_accuracy_per_class[GT.GTSRB.mandatory_classes].sum() / len(GT.GTSRB.mandatory_classes)))
-        print('test set: accuracy on unique: {:.3f}'.format(
+        print('test set: accuracy on unique: {:.4f}'.format(
             test_accuracy_per_class[GT.GTSRB.unique_classes].sum() / len(GT.GTSRB.unique_classes)))
         print('model saved to ' + checkpoint_path)
 
