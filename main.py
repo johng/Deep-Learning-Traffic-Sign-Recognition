@@ -42,6 +42,7 @@ tf.app.flags.DEFINE_integer('seed', 10, 'Seed')
 tf.app.flags.DEFINE_bool('multi-scale', False, 'Enable multi scale feature. (default: %(default)d')
 tf.app.flags.DEFINE_bool('crelu', False, 'Enable CReLU activation. (default: %(default)d')
 tf.app.flags.DEFINE_bool('use-augmented-data', False, 'Whether to use pre-generated augmented data on this run')
+tf.app.flags.DEFINE_bool('adam-optimiser', False, 'Use AdamOptimiser, else use MGD. %(default)d')
 tf.app.flags.DEFINE_bool('normalise-data', True, 'Whether to normalise the training and test data on a per-image basis')
 tf.app.flags.DEFINE_bool('whiten-data', True, 'Whether to \'whiten\' the training and test data on a whole-set basis')
 tf.app.flags.DEFINE_bool('adam-optimiser' ,False, 'Use AdamOptimiser, else use MGD. %(default)d')
@@ -57,9 +58,8 @@ run_log_dir = os.path.join(FLAGS.log_dir, 'exp_bs={bs}_lr={lr}_aug={aug}_'
 
                            .format(bs=FLAGS.batch_size, lr=FLAGS.learning_rate, aug=FLAGS.use_augmented_data,
                                    nd=FLAGS.normalise_data, wd=FLAGS.whiten_data, crelu=FLAGS.crelu,
-                                   ms=FLAGS.multi_scale,adam=FLAGS.adam_optimiser, norm=FLAGS.norm_layer,
-                                   lr_d=FLAGS.lr_decay,do_keep=FLAGS.dropout_keep_rate))
-
+                                   ms=FLAGS.multi_scale, adam=FLAGS.adam_optimiser, norm=FLAGS.norm_layer,
+                                   lr_d=FLAGS.lr_decay, do_keep=FLAGS.dropout_keep_rate))
 
 checkpoint_path = os.path.join(run_log_dir, 'model.ckpt')
 best_model_path = os.path.join('{cwd}/logs/best'.format(cwd=os.getcwd()), 'model.ckpt')
@@ -69,8 +69,8 @@ gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=FLAGS.gpu_memory_fra
 
 np.random.seed(FLAGS.seed)
 
-def deepnn(x_image, output=43):
 
+def deepnn(x_image, output=43):
     padding_pooling = [[0, 0], [0, 1], [0, 1], [0, 0]]
 
     activation = tf.nn.relu
@@ -203,7 +203,7 @@ def deepnn(x_image, output=43):
     else:
         full_pool = conv4_flat
 
-    full_pool = tf.nn.dropout(full_pool , FLAGS.dropout_keep_rate, seed=FLAGS.seed)
+    full_pool = tf.nn.dropout(full_pool, FLAGS.dropout_keep_rate, seed=FLAGS.seed)
     logits = tf.layers.dense(inputs=full_pool,
                              units=output,
                              kernel_regularizer=weight_decay,
@@ -258,7 +258,8 @@ def main(_):
                                                                                      global_step=global_step)
         # TODO: Fix adam optimiser
         if FLAGS.adam_optimiser:
-            train_step = tf.train.AdamOptimizer(learning_rate=decayed_learning_rate).minimize(cross_entropy, global_step=global_step)
+            train_step = tf.train.AdamOptimizer(learning_rate=decayed_learning_rate).minimize(cross_entropy,
+                                                                                              global_step=global_step)
 
     loss_summary = tf.summary.scalar("Loss", cross_entropy)
     accuracy_summary = tf.summary.scalar("Accuracy", accuracy)

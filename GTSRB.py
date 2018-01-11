@@ -102,6 +102,20 @@ class GTSRB:
     def _get_batch(self, data_set, allow_smaller_batches=False):
         return self.batch_generator(data_set, self.batch_size)
 
+    def count_sign_types(self):
+        classes_counts = np.sum(self.train_labels, axis=0)
+        sign_type_counts = {}
+        sign_type_counts['speed_limits'] = np.sum(classes_counts[self.speed_limit_classes])
+        sign_type_counts['prohibitory'] = np.sum(classes_counts[self.prohibitory_classes])
+        sign_type_counts['derestriction'] = np.sum(classes_counts[self.derestriction_classes])
+        sign_type_counts['mandatory'] = np.sum(classes_counts[self.mandatory_classes])
+        sign_type_counts['danger'] = np.sum(classes_counts[self.danger_classes])
+        sign_type_counts['unique'] = np.sum(classes_counts[self.unique_classes])
+        return sign_type_counts
+
+    def count_classes(self):
+        return np.sum(self.train_labels, axis=0)
+
     def view_image_labels(self):
         from matplotlib import pyplot as plt
         seen_labels = []
@@ -115,3 +129,12 @@ class GTSRB:
                 plt.figure()
                 plt.imshow(self.train_data[r])
                 plt.show()
+
+
+if __name__ == '__main__':
+    g = GTSRB(use_augmented_data=False, normalise_data=False, whiten_data=False)
+    sign_type_counts = g.count_sign_types()
+    print(sign_type_counts)
+
+    class_counts = g.count_classes()
+    print(class_counts)
