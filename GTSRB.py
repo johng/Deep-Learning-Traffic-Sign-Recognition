@@ -113,6 +113,9 @@ class GTSRB:
         sign_type_counts['unique'] = np.sum(classes_counts[self.unique_classes])
         return sign_type_counts
 
+    def count_classes(self):
+        return np.sum(self.train_labels, axis=0)
+
     def view_image_labels(self):
         from matplotlib import pyplot as plt
         seen_labels = []
@@ -132,3 +135,6 @@ if __name__ == '__main__':
     g = GTSRB(use_augmented_data=False, normalise_data=False, whiten_data=False)
     sign_type_counts = g.count_sign_types()
     print(sign_type_counts)
+
+    class_counts = g.count_classes()
+    print(class_counts)
