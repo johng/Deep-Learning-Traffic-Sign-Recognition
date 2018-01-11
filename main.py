@@ -29,6 +29,12 @@ tf.app.flags.DEFINE_float('dropout-keep-rate', 0.7, 'Fraction of connections to 
 tf.app.flags.DEFINE_integer('early-stop-epochs', 10,
                             'Number of steps without improvement before stopping. (default: %(default)d')
 
+tf.app.flags.DEFINE_bool('multi-scale', False,
+                            'Enable multi scale feature. (default: %(default)d')
+
+
+tf.app.flags.DEFINE_bool('crelu', False, 'Enable crelu activation. (default: %(default)d')
+
 # Graph Options
 tf.app.flags.DEFINE_bool('data-augment', True, 'Add randomized rotation and flipping to training data')
 tf.app.flags.DEFINE_bool('use-profile', False, 'Record trace timeline data')
@@ -55,6 +61,10 @@ gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=FLAGS.gpu_memory_fra
 def deepnn(x_image, output=43):
     padding_pooling = [[0, 0], [0, 1], [0, 1], [0, 0]]
 
+    activation = tf.nn.relu
+    if FLAGS.crelu:
+        activation = tf.nn.crelu
+
     weight_decay = tf.contrib.layers.l2_regularizer(scale=0.0001)
 
     # First convolutional layer - maps one RGB image to 32 feature maps.
@@ -67,7 +77,7 @@ def deepnn(x_image, output=43):
         use_bias=False,
         kernel_regularizer=weight_decay,
         name='conv1',
-        activation=tf.nn.crelu,
+        activation=activation,
     )
     conv1_bn = tf.layers.batch_normalization(conv1)
     #conv1_bn_pad = tf.pad(conv1_bn, padding_pooling, "CONSTANT")
@@ -85,7 +95,7 @@ def deepnn(x_image, output=43):
         kernel_initializer=tf.truncated_normal_initializer(mean=0, stddev=0.01),
         kernel_size=[5, 5],
         padding='same',
-        activation=tf.nn.crelu,
+        activation=activation,
         use_bias=False,
         kernel_regularizer=weight_decay,
         name='conv2'
@@ -106,7 +116,7 @@ def deepnn(x_image, output=43):
         filters=64,
         kernel_size=[5, 5],
         padding='same',
-        activation=tf.nn.crelu,
+        activation=activation,
         use_bias=False,
         kernel_regularizer=weight_decay,
         name='conv3'
@@ -126,7 +136,7 @@ def deepnn(x_image, output=43):
         filters=64,
         kernel_size=[4, 4],
         padding='same',
-        activation=tf.nn.crelu,
+        activation=activation,
         kernel_regularizer=weight_decay,
         use_bias=False,
         name='conv4'
@@ -161,8 +171,13 @@ def deepnn(x_image, output=43):
     pool3_flat = tf.contrib.layers.flatten(pool3_multiscale)
     conv4_flat = tf.contrib.layers.flatten(conv4_bn)
 
-    full_pool = tf.nn.dropout(tf.concat([pool1_flat, pool2_flat, pool3_flat, conv4_flat], axis=1),
-                              FLAGS.dropout_keep_rate)
+    if FLAGS.multi_scale:
+        full_pool = tf.nn.dropout(tf.concat([pool1_flat, pool2_flat, pool3_flat, conv4_flat], axis=1),
+                                  FLAGS.dropout_keep_rate)
+    else:
+        full_pool = conv4_flat
+
+
     logits = tf.layers.dense(inputs=full_pool,
                              units=output,
                              kernel_regularizer=weight_decay,
