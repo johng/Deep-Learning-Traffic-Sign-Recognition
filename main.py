@@ -7,6 +7,7 @@ import os
 import GTSRB as GT
 import tensorflow as tf
 import numpy as np
+import improved_network import deepnn_v2
 from tensorflow.python.client import timeline
 
 here = os.path.dirname(__file__)
@@ -43,11 +44,11 @@ tf.app.flags.DEFINE_bool('crelu', False, 'Enable CReLU activation. (default: %(d
 tf.app.flags.DEFINE_bool('use-augmented-data', False, 'Whether to use pre-generated augmented data on this run')
 tf.app.flags.DEFINE_bool('normalise-data', True, 'Whether to normalise the training and test data on a per-image basis')
 tf.app.flags.DEFINE_bool('whiten-data', True, 'Whether to \'whiten\' the training and test data on a whole-set basis')
-tf.app.flags.DEFINE_bool('adam-optimiser' ,True, 'Use AdamOptimiser, else use MGD. %(default)d')
+tf.app.flags.DEFINE_bool('adam-optimiser' ,False, 'Use AdamOptimiser, else use MGD. %(default)d')
 tf.app.flags.DEFINE_bool('norm_layer' ,True, 'Use normalisation layer. %(default)d')
 tf.app.flags.DEFINE_bool('lr_decay' ,True, 'Learning rate decay. %(default)d')
 tf.app.flags.DEFINE_float('dropout-keep-rate', 1, 'Fraction of connections to keep. (default: %(default)d')
-
+tf.app.flags.DEFINE_bool('max-pools', False, 'Use 3 max pooling layers')
 
 run_log_dir = os.path.join(FLAGS.log_dir, 'exp_bs={bs}_lr={lr}_aug={aug}_'
                                           'normd={nd}_wd={wd}_crelu={crelu}_'
@@ -228,7 +229,10 @@ def main(_):
         global_epoch = tf.placeholder(tf.int32)
 
     with tf.name_scope('model'):
-        y_conv = deepnn(x_image)
+        if FLAGS.max_pools:
+            y_conv = deepnn_v2(x_image)
+        else:
+            y_conv = deepnn(x_image)
 
     cross_entropy = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=y_, logits=y_conv))
     correct_prediction = tf.equal(tf.argmax(y_conv, axis=1), tf.argmax(y_, axis=1))
