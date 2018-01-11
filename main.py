@@ -31,8 +31,7 @@ tf.app.flags.DEFINE_integer('early-stop-epochs', 10,
                             'Number of steps without improvement before stopping. (default: %(default)d')
 
 tf.app.flags.DEFINE_bool('multi-scale', False,
-                            'Enable multi scale feature. (default: %(default)d')
-
+                         'Enable multi scale feature. (default: %(default)d')
 
 tf.app.flags.DEFINE_bool('crelu', False, 'Enable crelu activation. (default: %(default)d')
 
@@ -81,7 +80,7 @@ def deepnn(x_image, output=43):
         activation=activation,
     )
     conv1_bn = tf.layers.batch_normalization(conv1)
-    #conv1_bn_pad = tf.pad(conv1_bn, padding_pooling, "CONSTANT")
+    # conv1_bn_pad = tf.pad(conv1_bn, padding_pooling, "CONSTANT")
     pool1 = tf.layers.average_pooling2d(
         inputs=conv1_bn,
         pool_size=[3, 3],
@@ -102,7 +101,7 @@ def deepnn(x_image, output=43):
         name='conv2'
     )
     conv2_bn = tf.layers.batch_normalization(conv2)
-    #conv2_bn_pad = tf.pad(conv2_bn, padding_pooling, "CONSTANT")
+    # conv2_bn_pad = tf.pad(conv2_bn, padding_pooling, "CONSTANT")
     pool2 = tf.layers.max_pooling2d(
         inputs=conv2_bn,
         pool_size=[3, 3],
@@ -154,14 +153,14 @@ def deepnn(x_image, output=43):
     pool2_multiscale = tf.layers.max_pooling2d(
         inputs=conv2_bn,
         pool_size=[3, 3],
-        strides=(4,2),
+        strides=(4, 2),
         padding='same',
         name='pool2_multiscale'
     )
     pool3_multiscale = tf.layers.max_pooling2d(
         inputs=conv3_bn,
         pool_size=[3, 3],
-        strides=(2,2),
+        strides=(2, 2),
         padding='same',
         name='pool3_multiscale'
 
@@ -177,7 +176,6 @@ def deepnn(x_image, output=43):
                                   FLAGS.dropout_keep_rate)
     else:
         full_pool = conv4_flat
-
 
     logits = tf.layers.dense(inputs=full_pool,
                              units=output,
@@ -206,13 +204,12 @@ def main(_):
         y_conv = deepnn(x_image)
 
     cross_entropy = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=y_, logits=y_conv))
-    correct_prediction = tf.equal(tf.argmax(y_conv, 1), tf.argmax(y_, 1))
+    correct_prediction = tf.equal(tf.argmax(y_conv, axis=1), tf.argmax(y_, axis=1))
     accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32), name='accuracy')
 
-    correct_per_class_onehot = tf.multiply(y_, y_conv)
     class_counts = tf.count_nonzero(y_, 0)
-    correct_per_class_count = tf.count_nonzero(correct_per_class_onehot, 0)
-    accuracy_per_class = tf.divide(correct_per_class_count, class_counts)
+    correct_per_class = tf.unsorted_segment_sum(data=tf.to_float(correct_prediction), segment_ids=tf.argmax(y_, axis=1),
+                                                num_segments=43)
 
     global_step = tf.Variable(0, trainable=False)  # this will be incremented automatically by tensorflow
     decay_steps = 30  # decay the learning rate every 1000 steps
@@ -302,30 +299,38 @@ def main(_):
         evaluated_images = 0
         test_accuracy = 0
         batch_count = 0
-        test_accuracy_per_class = np.zeros(43)
+        test_class_counts = np.zeros(43)
+        test_correct_per_class = np.zeros(43)
 
         gtsrb.reset()
         best_saver.restore(sess, best_model_path)
         test_batch_generator = gtsrb.batch_generator('test', batch_size=FLAGS.batch_size, limit=True)
         for (testImages, testLabels) in test_batch_generator:
-            test_accuracy_temp, test_accuracy_per_class_temp = sess.run([accuracy, accuracy_per_class],
-                                                                        feed_dict={x_image: testImages, y_: testLabels,
-                                                                                   augment: False})
+            test_accuracy_temp, test_class_counts_temp, test_correct_per_class_temp = sess.run(
+                [accuracy, class_counts, correct_per_class],
+                feed_dict={x_image: testImages, y_: testLabels,
+                           augment: False})
 
             batch_count += 1
             test_accuracy += test_accuracy_temp
-            test_accuracy_per_class = np.add(test_accuracy_per_class, test_accuracy_per_class_temp)
+            test_class_counts = np.add(test_class_counts, test_class_counts_temp)
+            test_correct_per_class = np.add(test_correct_per_class, test_correct_per_class_temp)
             evaluated_images += len(testLabels)
 
         test_accuracy = test_accuracy / batch_count
-        test_accuracy_per_class = test_accuracy_per_class / batch_count
+        test_accuracy_per_class = test_correct_per_class / test_class_counts
         print('test set: accuracy on test set: %.3f' % test_accuracy)
-        print('test set: accuracy on test set per class: {}'.format(test_accuracy_per_class))
-        print('test set: accuracy on speed limits: {:.3f}'.format(test_accuracy_per_class[GT.GTSRB.speed_limit_classes].sum()))
-        print('test set: accuracy on prohibitory: {:.3f}'.format(test_accuracy_per_class[GT.GTSRB.prohibitory_classes].sum()))
-        print('test set: accuracy on derestriction: {:.3f}'.format(test_accuracy_per_class[GT.GTSRB.derestriction_classes].sum()))
-        print('test set: accuracy on mandatory: {:.3f}'.format(test_accuracy_per_class[GT.GTSRB.mandatory_classes].sum()))
-        print('test set: accuracy on unique: {:.3f}'.format(test_accuracy_per_class[GT.GTSRB.unique_classes].sum()))
+        print('test set: check accuracy: {:.3f}'.format(test_correct_per_class.sum() / test_class_counts.sum()))
+        print('test set: accuracy on speed limits: {:.3f}'.format(
+            test_accuracy_per_class[GT.GTSRB.speed_limit_classes].sum() / len(GT.GTSRB.speed_limit_classes)))
+        print('test set: accuracy on prohibitory: {:.3f}'.format(
+            test_accuracy_per_class[GT.GTSRB.prohibitory_classes].sum() / len(GT.GTSRB.prohibitory_classes)))
+        print('test set: accuracy on derestriction: {:.3f}'.format(
+            test_accuracy_per_class[GT.GTSRB.derestriction_classes].sum() / len(GT.GTSRB.derestriction_classes)))
+        print('test set: accuracy on mandatory: {:.3f}'.format(
+            test_accuracy_per_class[GT.GTSRB.mandatory_classes].sum() / len(GT.GTSRB.mandatory_classes)))
+        print('test set: accuracy on unique: {:.3f}'.format(
+            test_accuracy_per_class[GT.GTSRB.unique_classes].sum() / len(GT.GTSRB.unique_classes)))
         print('model saved to ' + checkpoint_path)
 
         train_writer.close()
