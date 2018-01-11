@@ -44,8 +44,8 @@ tf.app.flags.DEFINE_bool('use-augmented-data', False, 'Whether to use pre-genera
 tf.app.flags.DEFINE_bool('normalise-data', True, 'Whether to normalise the training and test data on a per-image basis')
 tf.app.flags.DEFINE_bool('whiten-data', True, 'Whether to \'whiten\' the training and test data on a whole-set basis')
 tf.app.flags.DEFINE_bool('adam-optimiser' ,False, 'Use AdamOptimiser, else use MGD. %(default)d')
-tf.app.flags.DEFINE_bool('norm_layer' ,False, 'Use normalisation layer. %(default)d')
-tf.app.flags.DEFINE_bool('lr_decay' ,False, 'Learning rate decay. %(default)d')
+tf.app.flags.DEFINE_bool('norm_layer' ,True, 'Use normalisation layer. %(default)d')
+tf.app.flags.DEFINE_bool('lr_decay' ,True, 'Learning rate decay. %(default)d')
 tf.app.flags.DEFINE_float('dropout-keep-rate', 1, 'Fraction of connections to keep. (default: %(default)d')
 
 
@@ -77,11 +77,13 @@ def deepnn(x_image, output=43):
 
     weight_decay = tf.contrib.layers.l2_regularizer(scale=0.0001)
 
+    kernel_initialiser = tf.random_uniform_initializer(-0.05, 0.05)
+
     # First convolutional layer - maps one RGB image to 32 feature maps.
     conv1 = tf.layers.conv2d(
         inputs=x_image,
         filters=32,
-        kernel_initializer=tf.truncated_normal_initializer(mean=0, stddev=0.01, seed=FLAGS.seed),
+        kernel_initializer=kernel_initialiser,
         kernel_size=[5, 5],
         padding='same',
         use_bias=False,
@@ -105,7 +107,7 @@ def deepnn(x_image, output=43):
     conv2 = tf.layers.conv2d(
         inputs=pool1,
         filters=32,
-        kernel_initializer=tf.truncated_normal_initializer(mean=0, stddev=0.01, seed=FLAGS.seed),
+        kernel_initializer=kernel_initialiser,
         kernel_size=[5, 5],
         padding='same',
         activation=activation,
@@ -117,7 +119,7 @@ def deepnn(x_image, output=43):
     if FLAGS.norm_layer:
         conv2_bn = tf.layers.batch_normalization(conv2)
     # conv2_bn_pad = tf.pad(conv2_bn, padding_pooling, "CONSTANT")
-    pool2 = tf.layers.max_pooling2d(
+    pool2 = tf.layers.average_pooling2d(
         inputs=conv2_bn,
         pool_size=[3, 3],
         strides=2,
@@ -127,7 +129,7 @@ def deepnn(x_image, output=43):
 
     conv3 = tf.layers.conv2d(
         inputs=pool2,
-        kernel_initializer=tf.truncated_normal_initializer(mean=0, stddev=0.01, seed=FLAGS.seed),
+        kernel_initializer=kernel_initialiser,
         filters=64,
         kernel_size=[5, 5],
         padding='same',
@@ -153,6 +155,7 @@ def deepnn(x_image, output=43):
     conv4 = tf.layers.conv2d(
         inputs=pool3,
         filters=64,
+        kernel_initializer=kernel_initialiser,
         kernel_size=[4, 4],
         padding='same',
         activation=activation,
