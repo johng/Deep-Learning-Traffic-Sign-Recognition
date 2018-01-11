@@ -44,15 +44,15 @@ tf.app.flags.DEFINE_bool('use-augmented-data', False, 'Whether to use pre-genera
 tf.app.flags.DEFINE_bool('normalise-data', True, 'Whether to normalise the training and test data on a per-image basis')
 tf.app.flags.DEFINE_bool('whiten-data', True, 'Whether to \'whiten\' the training and test data on a whole-set basis')
 tf.app.flags.DEFINE_bool('adam-optimiser' ,False, 'Use AdamOptimiser, else use MGD. %(default)d')
-tf.app.flags.DEFINE_bool('norm_layer' ,True, 'Use normalisation layer. %(default)d')
+tf.app.flags.DEFINE_bool('norm_layer' ,False, 'Use normalisation layer. %(default)d')
 tf.app.flags.DEFINE_bool('lr_decay' ,False, 'Learning rate decay. %(default)d')
 tf.app.flags.DEFINE_float('dropout-keep-rate', 1, 'Fraction of connections to keep. (default: %(default)d')
 
 
-run_log_dir = os.path.join(FLAGS.log_dir, 'exp_bs_{bs}_lr_{lr}_aug_{aug}_'
-                                          'normd_{nd}_wd_{wd}_crelu_{crelu}_'
-                                          'ms_{ms}_adam_{adam}_normlayer_{norm}'
-                                          'lr_decay_{lr_d}_dropoutkeep_{do_keep}'
+run_log_dir = os.path.join(FLAGS.log_dir, 'exp_bs={bs}_lr={lr}_aug={aug}_'
+                                          'normd={nd}_wd={wd}_crelu={crelu}_'
+                                          'ms={ms}_adam={adam}_normlayer={norm}_'
+                                          'lr_decay={lr_d}_dropoutkeep={do_keep}'
 
                            .format(bs=FLAGS.batch_size, lr=FLAGS.learning_rate, aug=FLAGS.use_augmented_data,
                                    nd=FLAGS.normalise_data, wd=FLAGS.whiten_data, crelu=FLAGS.crelu,
