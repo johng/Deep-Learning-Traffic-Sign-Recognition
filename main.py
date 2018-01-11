@@ -33,17 +33,16 @@ tf.app.flags.DEFINE_integer('early-stop-epochs', 10,
 tf.app.flags.DEFINE_bool('multi-scale', False,
                          'Enable multi scale feature. (default: %(default)d')
 
-tf.app.flags.DEFINE_bool('crelu', False, 'Enable crelu activation. (default: %(default)d')
+tf.app.flags.DEFINE_bool('crelu', False, 'Enable CReLU activation. (default: %(default)d')
 
 # Graph Options
-tf.app.flags.DEFINE_bool('data-augment', True, 'Add randomized rotation and flipping to training data')
 tf.app.flags.DEFINE_bool('use-profile', False, 'Record trace timeline data')
 
 # Execution environment options
 tf.app.flags.DEFINE_float('gpu-memory-fraction', 0.8, 'Fraction of the GPU\'s memory to use')
 
 # Implementation options
-tf.app.flags.DEFINE_bool('use-augmented-data', True, 'Whether to use pre-generated augmented data on this run')
+tf.app.flags.DEFINE_bool('use-augmented-data', False, 'Whether to use pre-generated augmented data on this run')
 tf.app.flags.DEFINE_bool('normalise-data', True, 'Whether to normalise the training and test data on a per-image basis')
 tf.app.flags.DEFINE_bool('whiten-data', True, 'Whether to \'whiten\' the training and test data on a whole-set basis')
 
