@@ -66,15 +66,16 @@ def deepnn(x_image, output=43):
         padding='same',
         use_bias=False,
         kernel_regularizer=weight_decay,
-        name='conv1'
+        name='conv1',
+        activation=tf.nn.crelu,
     )
-    conv1_bn = tf.nn.crelu(tf.layers.batch_normalization(conv1))
-    conv1_bn_pad = tf.pad(conv1_bn, padding_pooling, "CONSTANT")
+    conv1_bn = tf.layers.batch_normalization(conv1)
+    #conv1_bn_pad = tf.pad(conv1_bn, padding_pooling, "CONSTANT")
     pool1 = tf.layers.average_pooling2d(
-        inputs=conv1_bn_pad,
+        inputs=conv1_bn,
         pool_size=[3, 3],
         strides=2,
-        padding='valid',
+        padding='same',
         name='pool1'
     )
 
@@ -89,13 +90,13 @@ def deepnn(x_image, output=43):
         kernel_regularizer=weight_decay,
         name='conv2'
     )
-    conv2_bn = tf.nn.crelu(tf.layers.batch_normalization(conv2))
-    conv2_bn_pad = tf.pad(conv2_bn, padding_pooling, "CONSTANT")
+    conv2_bn = tf.layers.batch_normalization(conv2)
+    #conv2_bn_pad = tf.pad(conv2_bn, padding_pooling, "CONSTANT")
     pool2 = tf.layers.max_pooling2d(
-        inputs=conv2_bn_pad,
+        inputs=conv2_bn,
         pool_size=[3, 3],
         strides=2,
-        padding='valid',
+        padding='same',
         name='pool2'
     )
 
@@ -110,13 +111,13 @@ def deepnn(x_image, output=43):
         kernel_regularizer=weight_decay,
         name='conv3'
     )
-    conv3_bn = tf.nn.crelu(tf.layers.batch_normalization(conv3))
+    conv3_bn = tf.layers.batch_normalization(conv3)
     conv3bn_pad = tf.pad(conv3_bn, padding_pooling, "CONSTANT")
     pool3 = tf.layers.max_pooling2d(
-        inputs=conv3bn_pad,
+        inputs=conv3_bn,
         pool_size=[3, 3],
         strides=2,
-        padding='valid',
+        padding='same',
         name='pool3'
     )
 
@@ -124,34 +125,35 @@ def deepnn(x_image, output=43):
         inputs=pool3,
         filters=64,
         kernel_size=[4, 4],
-        padding='valid',
-        activation=tf.nn.relu,
+        padding='same',
+        activation=tf.nn.crelu,
         kernel_regularizer=weight_decay,
         use_bias=False,
         name='conv4'
     )
-    conv4_bn = tf.nn.relu(tf.layers.batch_normalization(conv4))
+    conv4_bn = (tf.layers.batch_normalization(conv4))
 
     pool1_multiscale = tf.layers.max_pooling2d(
-        inputs=conv1_bn_pad,
+        inputs=conv4_bn,
         pool_size=[3, 3],
-        strides=8,
-        padding='valid',
+        strides=1,
+        padding='same',
         name='pool1_multiscale'
     )
     pool2_multiscale = tf.layers.max_pooling2d(
-        inputs=conv2_bn_pad,
+        inputs=conv2_bn,
         pool_size=[3, 3],
-        strides=4,
-        padding='valid',
+        strides=(4,2),
+        padding='same',
         name='pool2_multiscale'
     )
     pool3_multiscale = tf.layers.max_pooling2d(
-        inputs=conv3bn_pad,
+        inputs=conv3_bn,
         pool_size=[3, 3],
-        strides=2,
-        padding='valid',
+        strides=(2,2),
+        padding='same',
         name='pool3_multiscale'
+
     )
     # Multi-Scale features - fast forward earlier layer results
     pool1_flat = tf.contrib.layers.flatten(pool1_multiscale)
