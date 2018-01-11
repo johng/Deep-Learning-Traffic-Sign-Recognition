@@ -43,7 +43,7 @@ tf.app.flags.DEFINE_bool('crelu', False, 'Enable CReLU activation. (default: %(d
 tf.app.flags.DEFINE_bool('use-augmented-data', False, 'Whether to use pre-generated augmented data on this run')
 tf.app.flags.DEFINE_bool('normalise-data', True, 'Whether to normalise the training and test data on a per-image basis')
 tf.app.flags.DEFINE_bool('whiten-data', True, 'Whether to \'whiten\' the training and test data on a whole-set basis')
-tf.app.flags.DEFINE_bool('adam-optimiser' ,False, 'Use AdamOptimiser, else use MGD. %(default)d')
+tf.app.flags.DEFINE_bool('adam-optimiser' ,True, 'Use AdamOptimiser, else use MGD. %(default)d')
 tf.app.flags.DEFINE_bool('norm_layer' ,True, 'Use normalisation layer. %(default)d')
 tf.app.flags.DEFINE_bool('lr_decay' ,True, 'Learning rate decay. %(default)d')
 tf.app.flags.DEFINE_float('dropout-keep-rate', 1, 'Fraction of connections to keep. (default: %(default)d')
@@ -251,8 +251,9 @@ def main(_):
     with tf.control_dependencies(update_ops):
         train_step = tf.train.MomentumOptimizer(decayed_learning_rate, 0.9).minimize(cross_entropy,
                                                                                      global_step=global_step)
+        # TODO: Fix adam optimiser
         if FLAGS.adam_optimiser:
-            train_step = tf.train.AdamOptimizer(decayed_learning_rate).minimize(cross_entropy, global_step=global_step)
+            train_step = tf.train.AdamOptimizer(learning_rate=decayed_learning_rate).minimize(cross_entropy, global_step=global_step)
 
     loss_summary = tf.summary.scalar("Loss", cross_entropy)
     accuracy_summary = tf.summary.scalar("Accuracy", accuracy)
