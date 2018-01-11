@@ -9,7 +9,7 @@ import tensorflow as tf
 import numpy as np
 from improved_network import deepnn_v2
 from tensorflow.python.client import timeline
-
+import pretty_print as pp
 here = os.path.dirname(__file__)
 sys.path.append(here)
 
@@ -233,8 +233,18 @@ def main(_):
         else:
             y_conv = deepnn(x_image)
 
+
+
+
+
+
+
+
     cross_entropy = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=y_, logits=y_conv))
     correct_prediction = tf.equal(tf.argmax(y_conv, axis=1), tf.argmax(y_, axis=1))
+
+    img_incorrect_summary = tf.boolean_mask(x_image, tf.logical_not(correct_prediction))
+
     accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32), name='accuracy')
 
     class_counts = tf.count_nonzero(y_, 0)
@@ -265,11 +275,16 @@ def main(_):
     learning_rate_summary = tf.summary.scalar("Learning Rate", decayed_learning_rate)
     img_summary = tf.summary.image('input images', x_image)
 
+
+    img_error_str = tf.summary.image('Incorrect validation', img_incorrect_summary)
+
     train_summary = tf.summary.merge([loss_summary, accuracy_summary, learning_rate_summary, img_summary])
-    validation_summary = tf.summary.merge([loss_summary, accuracy_summary])
+    validation_summary = tf.summary.merge([loss_summary, accuracy_summary, img_error_str])
 
     saver = tf.train.Saver(tf.global_variables(), max_to_keep=1)
     best_saver = tf.train.Saver(max_to_keep=1)
+
+
 
     with tf.Session(config=tf.ConfigProto(gpu_options=gpu_options)) as sess:
         train_writer = tf.summary.FileWriter(run_log_dir + "_train", sess.graph)
@@ -305,6 +320,9 @@ def main(_):
                 validation_accuracy, validation_summary_str = sess.run([accuracy, validation_summary],
                                                                        feed_dict={x_image: testImages, y_: testLabels,
                                                                                   augment: False})
+
+
+
                 total_validation_accuracy += validation_accuracy
                 validation_batches += 1
             validation_accuracy = total_validation_accuracy / validation_batches
