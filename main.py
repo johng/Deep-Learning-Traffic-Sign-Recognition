@@ -66,6 +66,7 @@ best_model_path = os.path.join('{cwd}/logs/best'.format(cwd=os.getcwd()), 'model
 # limit the process memory to a third of the total gpu memory
 gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=FLAGS.gpu_memory_fraction)
 
+np.random.seed(FLAGS.seed)
 
 def deepnn(x_image, output=43):
 
