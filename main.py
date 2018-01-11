@@ -7,7 +7,7 @@ import os
 import GTSRB as GT
 import tensorflow as tf
 import numpy as np
-import improved_network import deepnn_v2
+from improved_network import deepnn_v2
 from tensorflow.python.client import timeline
 
 here = os.path.dirname(__file__)
@@ -42,7 +42,6 @@ tf.app.flags.DEFINE_integer('seed', 10, 'Seed')
 tf.app.flags.DEFINE_bool('multi-scale', False, 'Enable multi scale feature. (default: %(default)d')
 tf.app.flags.DEFINE_bool('crelu', False, 'Enable CReLU activation. (default: %(default)d')
 tf.app.flags.DEFINE_bool('use-augmented-data', False, 'Whether to use pre-generated augmented data on this run')
-tf.app.flags.DEFINE_bool('adam-optimiser', False, 'Use AdamOptimiser, else use MGD. %(default)d')
 tf.app.flags.DEFINE_bool('normalise-data', True, 'Whether to normalise the training and test data on a per-image basis')
 tf.app.flags.DEFINE_bool('whiten-data', True, 'Whether to \'whiten\' the training and test data on a whole-set basis')
 tf.app.flags.DEFINE_bool('adam-optimiser' ,False, 'Use AdamOptimiser, else use MGD. %(default)d')
