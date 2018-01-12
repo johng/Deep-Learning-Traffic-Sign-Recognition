@@ -2,9 +2,11 @@ import tensorflow as tf
 
 FLAGS = tf.app.flags.FLAGS
 
-def deepnn_v2(x_image, output=43):
 
-    padding_pooling = [[0, 0], [0, 1], [0, 1], [0, 0]]
+'''
+An alternative architecture, with a different combination of sub sampling layers
+'''
+def deepnn_v2(x_image, output=43):
 
     activation = tf.nn.relu
     if FLAGS.crelu:
@@ -53,7 +55,6 @@ def deepnn_v2(x_image, output=43):
     conv2_bn = conv2
     if FLAGS.norm_layer:
         conv2_bn = tf.layers.batch_normalization(conv2)
-    # conv2_bn_pad = tf.pad(conv2_bn, padding_pooling, "CONSTANT")
     pool2 = tf.layers.max_pooling2d(
         inputs=conv2_bn,
         pool_size=[3, 3],
@@ -78,7 +79,6 @@ def deepnn_v2(x_image, output=43):
     if FLAGS.norm_layer:
         conv3_bn = tf.layers.batch_normalization(conv3)
 
-    conv3bn_pad = tf.pad(conv3_bn, padding_pooling, "CONSTANT")
     pool3 = tf.layers.max_pooling2d(
         inputs=conv3_bn,
         pool_size=[3, 3],

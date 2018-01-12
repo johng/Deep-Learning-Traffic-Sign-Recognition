@@ -10,11 +10,12 @@ import numpy as np
 from improved_network import deepnn_v2
 from tensorflow.python.client import timeline
 import time
-import pretty_print as pp
 here = os.path.dirname(__file__)
 sys.path.append(here)
 
 FLAGS = tf.app.flags.FLAGS
+
+# Logging flags
 tf.app.flags.DEFINE_integer('log-frequency', 100,
                             'Number of steps between logging results to the console and saving summaries. (default: %(default)d)')
 tf.app.flags.DEFINE_integer('flush-frequency', 50,
@@ -41,11 +42,11 @@ tf.app.flags.DEFINE_integer('seed', 10, 'Seed')
 
 # Implementation options
 tf.app.flags.DEFINE_bool('multi-scale', False, 'Enable multi scale feature. (default: %(default)d')
-tf.app.flags.DEFINE_bool('crelu', False, 'Enable CReLU activation. (default: %(default)d')
+tf.app.flags.DEFINE_bool('crelu', True, 'Enable CReLU activation. (default: %(default)d')
 tf.app.flags.DEFINE_bool('use-augmented-data', False, 'Whether to use pre-generated augmented data on this run')
 tf.app.flags.DEFINE_bool('normalise-data', True, 'Whether to normalise the training and test data on a per-image basis')
 tf.app.flags.DEFINE_bool('whiten-data', True, 'Whether to \'whiten\' the training and test data on a whole-set basis')
-tf.app.flags.DEFINE_bool('adam-optimiser' ,False, 'Use AdamOptimiser, else use MGD. %(default)d')
+tf.app.flags.DEFINE_bool('adam-optimser' ,False, 'Use AdamOptimiser, else use MGD. %(default)d')
 tf.app.flags.DEFINE_bool('norm_layer' ,True, 'Use normalisation layer. %(default)d')
 tf.app.flags.DEFINE_bool('lr_decay' ,True, 'Learning rate decay. %(default)d')
 tf.app.flags.DEFINE_float('dropout-keep-rate', 1, 'Fraction of connections to keep. (default: %(default)d')
@@ -69,10 +70,12 @@ gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=FLAGS.gpu_memory_fra
 
 np.random.seed(FLAGS.seed)
 
-
 def deepnn(x_image, output=43):
-    padding_pooling = [[0, 0], [0, 1], [0, 1], [0, 0]]
-
+    """
+    :param x_image: Graph input
+    :param output: Graph output size
+    :return: Convolution Neural Network Construction
+    """
     activation = tf.nn.relu
     if FLAGS.crelu:
         activation = tf.nn.crelu
@@ -97,7 +100,6 @@ def deepnn(x_image, output=43):
     conv1_bn = conv1
     if FLAGS.norm_layer:
         conv1_bn = tf.layers.batch_normalization(conv1)
-    # conv1_bn_pad = tf.pad(conv1_bn, padding_pooling, "CONSTANT")
     pool1 = tf.layers.average_pooling2d(
         inputs=conv1_bn,
         pool_size=[3, 3],
@@ -120,7 +122,7 @@ def deepnn(x_image, output=43):
     conv2_bn = conv2
     if FLAGS.norm_layer:
         conv2_bn = tf.layers.batch_normalization(conv2)
-    # conv2_bn_pad = tf.pad(conv2_bn, padding_pooling, "CONSTANT")
+
     pool2 = tf.layers.average_pooling2d(
         inputs=conv2_bn,
         pool_size=[3, 3],
@@ -145,7 +147,6 @@ def deepnn(x_image, output=43):
     if FLAGS.norm_layer:
         conv3_bn = tf.layers.batch_normalization(conv3)
 
-    conv3bn_pad = tf.pad(conv3_bn, padding_pooling, "CONSTANT")
     pool3 = tf.layers.max_pooling2d(
         inputs=conv3_bn,
         pool_size=[3, 3],
@@ -192,6 +193,7 @@ def deepnn(x_image, output=43):
         name='pool3_multiscale'
 
     )
+
     # Multi-Scale features - fast forward earlier layer results
     pool1_flat = tf.contrib.layers.flatten(pool1_multiscale)
     pool2_flat = tf.contrib.layers.flatten(pool2_multiscale)
@@ -234,24 +236,22 @@ def main(_):
         else:
             y_conv = deepnn(x_image)
 
-
-
-
-
-
-
-
+    # Evaluating the output of the CNN
     cross_entropy = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=y_, logits=y_conv))
     correct_prediction = tf.equal(tf.argmax(y_conv, axis=1), tf.argmax(y_, axis=1))
 
-    img_incorrect_summary = tf.boolean_mask(x_image, tf.logical_not(correct_prediction))
-
     accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32), name='accuracy')
+
+    # Extract the correct and miss classified images
+    img_incorrect_summary = tf.boolean_mask(x_image, tf.logical_not(correct_prediction))
+    img_correct_summary = tf.boolean_mask(x_image, tf.logical_not(correct_prediction))
+
 
     class_counts = tf.count_nonzero(y_, 0)
     correct_per_class = tf.unsorted_segment_sum(data=tf.to_float(correct_prediction), segment_ids=tf.argmax(y_, axis=1),
                                                 num_segments=43)
 
+    # Configure back-progigation
     global_step = tf.Variable(0, trainable=False)  # this will be incremented automatically by tensorflow
     decay_steps = 30  # decay the learning rate every 1000 steps
     decay_rate = 0.9  # the base of our exponential for the decay
@@ -271,11 +271,11 @@ def main(_):
             train_step = tf.train.AdamOptimizer(learning_rate=decayed_learning_rate).minimize(cross_entropy,
                                                                                               global_step=global_step)
 
+    # Generate summary strings for use in Tensorboard
     loss_summary = tf.summary.scalar("Loss", cross_entropy)
     accuracy_summary = tf.summary.scalar("Accuracy", accuracy)
     learning_rate_summary = tf.summary.scalar("Learning Rate", decayed_learning_rate)
     img_summary = tf.summary.image('input images', x_image)
-
 
     img_error_str = tf.summary.image('Incorrect validation', img_incorrect_summary)
 
@@ -284,8 +284,6 @@ def main(_):
 
     saver = tf.train.Saver(tf.global_variables(), max_to_keep=1)
     best_saver = tf.train.Saver(max_to_keep=1)
-
-
 
     with tf.Session(config=tf.ConfigProto(gpu_options=gpu_options)) as sess:
         train_writer = tf.summary.FileWriter(run_log_dir + "_train", sess.graph)
@@ -322,8 +320,6 @@ def main(_):
                 validation_accuracy, validation_summary_str = sess.run([accuracy, validation_summary],
                                                                        feed_dict={x_image: testImages, y_: testLabels,
                                                                                   augment: False})
-
-
 
                 total_validation_accuracy += validation_accuracy
                 validation_batches += 1
