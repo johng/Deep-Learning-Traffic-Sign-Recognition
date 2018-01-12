@@ -16,16 +16,18 @@ augmentations = iaa.SomeOf(1, [
         pad_mode=ia.ALL,
         pad_cval=(0, 128)
     ),
-    #iaa.CoarseDropout(p=(0.05, 0.2), size_percent=(0.15, 0.20)),
+     iaa.CoarseDropout(p=(0.05, 0.2), size_percent=(0.15, 0.20)),
     # iaa.WithColorspace(from_colorspace='RGB', to_colorspace='HSV', children=iaa.WithChannels(2, iaa.Add((0,10)))),
     iaa.Add((-50, 50)),
-    #iaa.AdditiveGaussianNoise(scale=(0, 0.05 * 255)),
+    iaa.ContrastNormalization((0.2,0.5)),
+    # iaa.AdditiveGaussianNoise(scale=(0, 0.05 * 255)),
     iaa.AverageBlur(k=((4, 8), (1, 3))),
     iaa.PerspectiveTransform(scale=(0.01, 0.2)),
-    iaa.Affine(rotate=(-30, 30), scale=(0.75, 1.25))
+    iaa.Affine(rotate=(-15, 15), scale=(0.75, 1.25))
 ], random_order=True)
 
 flipseq = iaa.Fliplr(1.0)
+
 
 def view_augmented_image(images, idx):
     # set SCIPY_PIL_IMAGE_VIEWER env variable to an image viewer executable
@@ -61,7 +63,7 @@ def generate_extended_set(gtsrb):
 
 
 if __name__ == '__main__':
-    data = GTSRB(use_augmented_data=False)
+    data = GTSRB(use_augmented_data=False, normalise_data=False)
     if sys.argv[1] == 'generate':
         print('Generating augmented data')
         generate_extended_set(data)

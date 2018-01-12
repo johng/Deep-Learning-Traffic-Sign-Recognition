@@ -9,6 +9,7 @@ import tensorflow as tf
 import numpy as np
 from improved_network import deepnn_v2
 from tensorflow.python.client import timeline
+import time
 import pretty_print as pp
 here = os.path.dirname(__file__)
 sys.path.append(here)
@@ -252,7 +253,7 @@ def main(_):
                                                 num_segments=43)
 
     global_step = tf.Variable(0, trainable=False)  # this will be incremented automatically by tensorflow
-    decay_steps = 50  # decay the learning rate every 1000 steps
+    decay_steps = 30  # decay the learning rate every 1000 steps
     decay_rate = 0.9  # the base of our exponential for the decay
     decayed_learning_rate = tf.train.exponential_decay(FLAGS.learning_rate, global_epoch,
                                                        decay_steps, decay_rate, staircase=False)
@@ -301,6 +302,7 @@ def main(_):
         steps_since_last_improvement = 0
         # Batch generator used for validation
         # Training and validation
+        start = time.time()
         for step in range(FLAGS.max_epochs):
             # Batch generator used for training in each epoch
             train_batch_generator = gtsrb.batch_generator('train', batch_size=FLAGS.batch_size, limit=True)
@@ -346,7 +348,9 @@ def main(_):
             if steps_since_last_improvement >= FLAGS.early_stop_epochs:
                 print('Stopping early')
                 break
-
+        end = time.time()
+        print("Time:")
+        print(end - start)
         # Resetting the internal batch indexes
         evaluated_images = 0
         test_accuracy = 0
