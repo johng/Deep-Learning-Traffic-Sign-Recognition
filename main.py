@@ -251,7 +251,7 @@ def main(_):
     correct_per_class = tf.unsorted_segment_sum(data=tf.to_float(correct_prediction), segment_ids=tf.argmax(y_, axis=1),
                                                 num_segments=43)
 
-    # Configure back-progigation
+    # Configure back-propagation
     global_step = tf.Variable(0, trainable=False)  # this will be incremented automatically by tensorflow
     decay_steps = 30  # decay the learning rate every 1000 steps
     decay_rate = 0.9  # the base of our exponential for the decay
@@ -266,10 +266,6 @@ def main(_):
     with tf.control_dependencies(update_ops):
         train_step = tf.train.MomentumOptimizer(decayed_learning_rate, 0.9).minimize(cross_entropy,
                                                                                      global_step=global_step)
-        # TODO: Fix adam optimiser
-        if FLAGS.adam_optimiser:
-            train_step = tf.train.AdamOptimizer(learning_rate=decayed_learning_rate).minimize(cross_entropy,
-                                                                                              global_step=global_step)
 
     # Generate summary strings for use in Tensorboard
     loss_summary = tf.summary.scalar("Loss", cross_entropy)
@@ -304,7 +300,6 @@ def main(_):
         for step in range(FLAGS.max_epochs):
             # Batch generator used for training in each epoch
             train_batch_generator = gtsrb.batch_generator('train', batch_size=FLAGS.batch_size, limit=True)
-            # rotated_training_images = sess.run([rotation], feed_dict={x_image: trainImages})
             for (trainImages, trainLabels) in train_batch_generator:
                 _, train_summary_str = sess.run([train_step, train_summary],
                                                 feed_dict={x_image: trainImages, y_: trainLabels, augment: True,
@@ -346,7 +341,8 @@ def main(_):
                 break
         end = time.time()
         print("Training time: {}".format(end - start))
-        # Resetting the internal batch indexes
+
+        # Resetting the internal batch indexes for the per class validation recording
         evaluated_images = 0
         test_accuracy = 0
         batch_count = 0
