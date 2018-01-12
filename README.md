@@ -14,11 +14,10 @@ pipenv install  # installs packages listed in Pipfile.lock
 
 ## Running
 
-```
-pipenv shell
-python augment_data.py generate  # generate augmented data
-python main.py --use-augmented-data
-```
+* Enter the pipenv environment: `pipenv shell`
+* Generate augmented data: `python augment_data.py generate`
+* Run the network in Zhang et al. replication mode: `python main.py`
+* Run the network in improved mode: `python main.py --multi-scale --crelu --use-augmented-data --dropout-keep-rate=0.7 --max-pools`
 
 You can view examples of augmentations by running
 
@@ -27,6 +26,8 @@ python augment_data.py show 1000
 ```
 
 where 1000 is the index of the image you want to view variants of. Environment variable `SCIPY_PIL_IMAGE_VIEWER` must be set to an image viewer.
+
+
 
 ## Architecture
 
