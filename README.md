@@ -2,7 +2,22 @@
 
 [Zhang et al. A Shallow Network with Combined Pooling for Fast Traffic Sign Recognition](http://www.mdpi.com/2078-2489/8/2/45/htm)
 
-## Setup
+## Replication
+
+By default all our improvements are disabled, so the replication can be run with
+
+`python main.py`
+
+
+## Improvement
+
+To run our improvemed version the augmented dataset must first be generated
+
+### Generating the Augmentated DataSet
+
+To generate the augmented data we use OpenCV to manipulate the training data
+
+####  Configuring OpenCV
 
 ```
 curl https://raw.githubusercontent.com/mitsuhiko/pipsi/master/get-pipsi.py | python
@@ -11,22 +26,22 @@ pipsi install pew
 pip install pipenv --user
 pipenv --site-packages  # initialises virtualenv with access to system installation of Tensorflow
 pipenv install  # installs packages listed in Pipfile.lock 
+
 ```
 
-## Running
+#### Executing the data augmentation
 
-* Enter the pipenv environment: `pipenv shell`
+* First enter the pipenv environment: `pipenv shell`
 * Generate augmented data: `python augment_data.py generate`
-* Run the network in Zhang et al. replication mode: `python main.py`
-* Run the network in improved mode: `python main.py --multi-scale --crelu --use-augmented-data --dropout-keep-rate=0.7 --max-pools`
+* Viewing augmented data `python augment_data.py show 1000`
 
-You can view examples of augmentations by running
-
-```
-python augment_data.py show 1000
-```
 
 where 1000 is the index of the image you want to view variants of. Environment variable `SCIPY_PIL_IMAGE_VIEWER` must be set to an image viewer.
+
+
+### Running the improved version
+
+`python main.py --multi-scale --crelu --use-augmented-data --dropout-keep-rate=0.7 --max-pools`
 
 
 
