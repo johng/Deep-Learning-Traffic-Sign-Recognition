@@ -323,8 +323,6 @@ def main(_):
                                                                        feed_dict={x_image: testImages, y_: testLabels,
                                                                                   augment: False})
 
-
-
                 total_validation_accuracy += validation_accuracy
                 validation_batches += 1
             validation_accuracy = total_validation_accuracy / validation_batches
@@ -349,8 +347,7 @@ def main(_):
                 print('Stopping early')
                 break
         end = time.time()
-        print("Time:")
-        print(end - start)
+        print("Training time: {}".format(end - start))
         # Resetting the internal batch indexes
         evaluated_images = 0
         test_accuracy = 0
@@ -361,6 +358,8 @@ def main(_):
         gtsrb.reset()
         best_saver.restore(sess, best_model_path)
         test_batch_generator = gtsrb.batch_generator('test', batch_size=FLAGS.batch_size, limit=True)
+
+        test_start_time = time.time()
         for (testImages, testLabels) in test_batch_generator:
             test_accuracy_temp, test_class_counts_temp, test_correct_per_class_temp = sess.run(
                 [accuracy, class_counts, correct_per_class],
@@ -372,6 +371,9 @@ def main(_):
             test_class_counts = np.add(test_class_counts, test_class_counts_temp)
             test_correct_per_class = np.add(test_correct_per_class, test_correct_per_class_temp)
             evaluated_images += len(testLabels)
+        test_end_time = time.time()
+        print("Testing time: {}".format(test_end_time - test_start_time))
+        print("Testing time per frame: {}".format((test_end_time - test_start_time) / len(gtsrb.test_data)))
 
         test_accuracy = test_accuracy / batch_count
         test_accuracy_per_class = test_correct_per_class / test_class_counts
