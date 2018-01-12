@@ -2,12 +2,17 @@
 
 [Zhang et al. A Shallow Network with Combined Pooling for Fast Traffic Sign Recognition](http://www.mdpi.com/2078-2489/8/2/45/htm)
 
+## Requirements
+
+* Tensorflow 1.2
+* Numpy
+* GTSRB Dataset 'gtsrb_dataset.npz'
+
 ## Replication
 
 By default all our improvements are disabled, so the replication can be run with
 
 `python main.py`
-
 
 ## Improvement
 
@@ -33,16 +38,15 @@ pipenv install  # installs packages listed in Pipfile.lock
 
 * First enter the pipenv environment: `pipenv shell`
 * Generate augmented data: `python augment_data.py generate`
-* Viewing augmented data `python augment_data.py show 1000`
 
-
-where 1000 is the index of the image you want to view variants of. Environment variable `SCIPY_PIL_IMAGE_VIEWER` must be set to an image viewer.
+##### Optional
+Viewing augmented data `python augment_data.py show 1000`
+Where 1000 is the index of the image you want to view variants of. Environment variable `SCIPY_PIL_IMAGE_VIEWER` must be set to an image viewer.
 
 
 ### Running the improved version
 
 `python main.py --multi-scale --crelu --use-augmented-data --dropout-keep-rate=0.7 --max-pools`
-
 
 
 ## Architecture
