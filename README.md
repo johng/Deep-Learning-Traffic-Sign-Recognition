@@ -6,6 +6,7 @@
 
 ```
 curl https://raw.githubusercontent.com/mitsuhiko/pipsi/master/get-pipsi.py | python
+pipsi install backports.shutil_get_terminal_size
 pipsi install pew
 pip install pipenv --user
 pipenv --site-packages  # initialises virtualenv with access to system installation of Tensorflow
